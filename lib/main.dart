@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:herlife/screens/auth_screens.dart';
+import 'package:herlife/screens/chat_screen.dart';
+import 'package:herlife/services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -18,7 +21,51 @@ class HerLifeApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFE56B8A)),
         fontFamily: 'sans',
       ),
-      home: const WelcomeScreen(),
+      home: const AppGate(),
+    );
+  }
+}
+
+/// Decides the first screen: logged out -> welcome, logged in without a
+/// stage -> stage picker, logged in with a stage -> the app.
+class AppGate extends StatefulWidget {
+  const AppGate({super.key});
+
+  @override
+  State<AppGate> createState() => _AppGateState();
+}
+
+class _AppGateState extends State<AppGate> {
+  late final Future<Widget> _destination;
+
+  @override
+  void initState() {
+    super.initState();
+    _destination = _decide();
+  }
+
+  Future<Widget> _decide() async {
+    if (!await AuthService.isLoggedIn()) return const WelcomeScreen();
+
+    final prefs = await SharedPreferences.getInstance();
+    final stage = prefs.getString('lifecycle_stage');
+
+    if (stage == null || stage.isEmpty) return const LifecycleScreen();
+    return const MainNavigation();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Widget>(
+      future: _destination,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return snapshot.data!;
+      },
     );
   }
 }
@@ -31,58 +78,55 @@ class WelcomeScreen extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(28),
+          padding: const EdgeInsets.all(24),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Spacer(),
-
+              const Icon(Icons.favorite, size: 80, color: Color(0xFFE56B8A)),
+              const SizedBox(height: 24),
               const Text(
-                'HerLife',
-                style: TextStyle(fontSize: 42, fontWeight: FontWeight.bold),
+                'Welcome to HerLife',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
               ),
-
-              const SizedBox(height: 16),
-
+              const SizedBox(height: 12),
               const Text(
-                'Your health, through every stage of life.',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
+                'Understand your health. Track your patterns. '
+                'Get information that fits your life stage.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
-
-              const SizedBox(height: 14),
-
-              Text(
-                'Track your health, understand your patterns, '
-                'and access trusted information — all in one place.',
-                style: TextStyle(
-                  fontSize: 16,
-                  height: 1.5,
-                  color: Colors.grey.shade700,
-                ),
-              ),
-
-              const Spacer(),
-
+              const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity,
-                height: 54,
+                height: 52,
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) => const LifecycleScreen(),
-                      ),
+                      MaterialPageRoute(builder: (_) => const SignUpScreen()),
                     );
                   },
                   child: const Text(
-                    'Get Started',
+                    'Create account',
                     style: TextStyle(fontSize: 16),
                   ),
                 ),
               ),
-
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    );
+                  },
+                  child: const Text('Log in', style: TextStyle(fontSize: 16)),
+                ),
+              ),
             ],
           ),
         ),
@@ -186,86 +230,105 @@ class _LifecycleScreenState extends State<LifecycleScreen> {
 
     final prefs = await SharedPreferences.getInstance();
 
-    await prefs.setString(
-      'lifecycle_stage',
-      selectedStage!,
-    );
+    await prefs.setString('lifecycle_stage', selectedStage!);
 
     if (!mounted) return;
 
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(
-        builder: (context) => const MainNavigation(),
-      ),
+      MaterialPageRoute(builder: (context) => const MainNavigation()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Your Health Stage'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Which stage best describes you?',
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
+      appBar: AppBar(title: const Text('Your Health Stage')),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Which stage best describes you?',
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
               ),
-            ),
 
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
 
-            Text(
-              'This helps HerLife provide more relevant information.',
-              style: TextStyle(
-                color: Colors.grey.shade700,
+              Text(
+                'This helps HerLife provide more relevant information.',
+                style: TextStyle(color: Colors.grey.shade700, fontSize: 15),
               ),
-            ),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-            Expanded(
-              child: ListView.builder(
-                itemCount: stages.length,
-                itemBuilder: (context, index) {
-                  final stage = stages[index];
+              Expanded(
+                child: GridView.builder(
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: stages.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 1.9,
+                  ),
+                  itemBuilder: (context, index) {
+                    final stage = stages[index];
+                    final isSelected = selectedStage == stage;
 
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    child: RadioListTile<String>(
-                      title: Text(stage),
-                      value: stage,
-                      groupValue: selectedStage,
-                      onChanged: (value) {
+                    return InkWell(
+                      onTap: () {
                         setState(() {
-                          selectedStage = value;
+                          selectedStage = stage;
                         });
                       },
-                    ),
-                  );
-                },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Card(
+                        margin: EdgeInsets.zero,
+                        elevation: isSelected ? 2 : 0,
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primaryContainer
+                            : null,
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Text(
+                              stage,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                                color: isSelected
+                                    ? Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimaryContainer
+                                    : null,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
 
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
 
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed:
-                    selectedStage == null ? null : _saveLifecycleStage,
-                child: const Text('Continue'),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: selectedStage == null ? null : _saveLifecycleStage,
+                  child: const Text('Continue', style: TextStyle(fontSize: 16)),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -285,6 +348,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String? mood;
   List<String> checkInSymptoms = [];
   String? lifecycleStage;
+  String? userName;
 
   @override
   void initState() {
@@ -295,67 +359,124 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _loadTrackingData() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final savedDate = prefs.getString('period_start');
+    final savedDates = prefs.getStringList('period_history') ?? [];
     final savedSymptoms = prefs.getStringList('symptoms') ?? [];
 
     final savedMood = prefs.getString('checkin_mood');
-    final savedCheckInSymptoms =
-        prefs.getStringList('checkin_symptoms') ?? [];
+    final savedCheckInSymptoms = prefs.getStringList('checkin_symptoms') ?? [];
 
-    final savedLifecycleStage =
-        prefs.getString('lifecycle_stage');
+    final savedLifecycleStage = prefs.getString('lifecycle_stage');
+    final savedName = await AuthService.currentName();
+
+    final parsedDates = savedDates
+        .map((date) => DateTime.tryParse(date))
+        .whereType<DateTime>()
+        .toList();
+
+    parsedDates.sort((a, b) => b.compareTo(a));
 
     if (!mounted) return;
 
     setState(() {
-      if (savedDate != null) {
-        periodStart = DateTime.tryParse(savedDate);
-      }
+      periodStart = parsedDates.isNotEmpty ? parsedDates.first : null;
 
       symptoms = savedSymptoms;
       mood = savedMood;
       checkInSymptoms = savedCheckInSymptoms;
       lifecycleStage = savedLifecycleStage;
+      userName = savedName;
     });
+  }
+
+  String _getStageMessage() {
+    switch (lifecycleStage) {
+      case 'Adolescence':
+        return 'Learn about the changes happening in your body and build healthy habits.';
+      case 'Menstruation':
+        return 'Track your cycle, understand symptoms, and notice your personal patterns.';
+      case 'Reproductive Health':
+        return 'Keep track of your reproductive health and understand your body better.';
+      case 'Pregnancy':
+        return 'Track your pregnancy journey and learn about changes throughout each stage.';
+      case 'Postpartum':
+        return 'Focus on recovery, wellbeing, and changes after childbirth.';
+      case 'Perimenopause':
+        return 'Understand changing cycles, symptoms, and patterns during this transition.';
+      case 'Menopause':
+        return 'Track symptoms and learn about your health during and after menopause.';
+      default:
+        return 'Track your health and understand your personal patterns.';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('HerLife')),
+      appBar: AppBar(
+        title: const Text('HerLife'),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'stage') {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LifecycleScreen()),
+                  (route) => false,
+                );
+              } else if (value == 'logout') {
+                await AuthService.logOut();
+                if (!mounted) return;
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const AppGate()),
+                  (route) => false,
+                );
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'stage', child: Text('Change life stage')),
+              PopupMenuItem(value: 'logout', child: Text('Log out')),
+            ],
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Good to see you!',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
+            Text(
+              userName == null ? 'Good to see you!' : 'Hi, $userName',
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
-
             const SizedBox(height: 8),
 
-            Text(
-              lifecycleStage == null
-                  ? 'Here’s your health overview.'
-                  : 'Your health stage: $lifecycleStage',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade700,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  lifecycleStage == null
+                      ? 'Here’s your health overview.'
+                      : 'Your health stage: $lifecycleStage',
+                  style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
+                ),
+
+                const SizedBox(height: 8),
+
+                Text(
+                  _getStageMessage(),
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.grey.shade700,
+                    height: 1.4,
+                  ),
+                ),
+              ],
             ),
 
             const SizedBox(height: 28),
 
             const Text(
               'Today',
-              style: TextStyle(
-                fontSize: 21,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 12),
@@ -403,28 +524,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               periodStart == null
                                   ? 'No period recorded yet'
                                   : 'Last period: '
-                                      '${periodStart!.day}/'
-                                      '${periodStart!.month}/'
-                                      '${periodStart!.year}',
+                                        '${periodStart!.day}/'
+                                        '${periodStart!.month}/'
+                                        '${periodStart!.year}',
                             ),
 
                             if (symptoms.isNotEmpty) ...[
                               const SizedBox(height: 4),
                               Text(
                                 'Symptoms: ${symptoms.join(', ')}',
-                                style: TextStyle(
-                                  color: Colors.grey.shade700,
-                                ),
+                                style: TextStyle(color: Colors.grey.shade700),
                               ),
                             ],
                           ],
                         ),
                       ),
 
-                      const Icon(
-                        Icons.arrow_forward_ios,
-                        size: 18,
-                      ),
+                      const Icon(Icons.arrow_forward_ios, size: 18),
                     ],
                   ),
                 ),
@@ -483,9 +599,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               Text(
                                 'Symptoms: '
                                 '${checkInSymptoms.join(', ')}',
-                                style: TextStyle(
-                                  color: Colors.grey.shade700,
-                                ),
+                                style: TextStyle(color: Colors.grey.shade700),
                               ),
                             ],
                           ],
@@ -501,10 +615,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             const Text(
               'Your Health Journey',
-              style: TextStyle(
-                fontSize: 21,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 12),
@@ -533,16 +644,62 @@ class TrackingScreen extends StatefulWidget {
 }
 
 class _TrackingScreenState extends State<TrackingScreen> {
-  DateTime? periodStart;
+  List<DateTime> periodHistory = [];
+  Map<String, DateTime> periodEndDates = {};
   final Set<String> symptoms = {};
 
-  final symptomOptions = [
+  final List<String> symptomOptions = [
     'Cramps',
     'Headache',
     'Fatigue',
     'Bloating',
     'Mood changes',
   ];
+
+  DateTime get today {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  DateTime? get latestPeriod {
+    if (periodHistory.isEmpty) return null;
+    return periodHistory.first;
+  }
+
+  int get cycleDay {
+    if (latestPeriod == null) return 0;
+
+    return today.difference(latestPeriod!).inDays + 1;
+  }
+
+  List<int> get cycleLengths {
+    if (periodHistory.length < 2) return [];
+
+    final sorted = [...periodHistory]..sort((a, b) => b.compareTo(a));
+
+    List<int> lengths = [];
+
+    for (int i = 0; i < sorted.length - 1; i++) {
+      lengths.add(sorted[i].difference(sorted[i + 1]).inDays);
+    }
+
+    return lengths;
+  }
+
+  double? get averageCycleLength {
+    if (cycleLengths.isEmpty) return null;
+
+    final total = cycleLengths.reduce((a, b) => a + b);
+    return total / cycleLengths.length;
+  }
+
+  DateTime? get nextPeriodDate {
+    if (latestPeriod == null) return null;
+
+    final cycleLength = averageCycleLength ?? 28;
+
+    return latestPeriod!.add(Duration(days: cycleLength.round()));
+  }
 
   @override
   void initState() {
@@ -553,34 +710,102 @@ class _TrackingScreenState extends State<TrackingScreen> {
   Future<void> _loadTrackingData() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final savedDate = prefs.getString('period_start');
-    final savedSymptoms = prefs.getStringList('symptoms') ?? [];
+    final savedDates = prefs.getStringList('period_history') ?? [];
+    final savedEndDates = prefs.getStringList('period_end_dates') ?? [];
 
-    if (!mounted) return;
+    final loadedEndDates = <String, DateTime>{};
+
+    for (final entry in savedEndDates) {
+      final parts = entry.split('|');
+
+      if (parts.length == 2) {
+        final date = DateTime.tryParse(parts[1]);
+
+        if (date != null) {
+          loadedEndDates[parts[0]] = date;
+        }
+      }
+    }
 
     setState(() {
-      if (savedDate != null) {
-        periodStart = DateTime.tryParse(savedDate);
-      }
+      periodHistory = savedDates
+          .map((date) => DateTime.tryParse(date))
+          .whereType<DateTime>()
+          .toList();
 
-      symptoms.addAll(savedSymptoms);
+      periodHistory.sort((a, b) => b.compareTo(a));
+
+      periodEndDates = loadedEndDates;
+
+      symptoms.addAll(prefs.getStringList('symptoms') ?? []);
     });
   }
 
   Future<void> _saveTrackingData() async {
     final prefs = await SharedPreferences.getInstance();
 
-    if (periodStart != null) {
-      await prefs.setString('period_start', periodStart!.toIso8601String());
-    }
+    periodHistory.sort((a, b) => b.compareTo(a));
+
+    await prefs.setStringList(
+      'period_history',
+      periodHistory.map((date) => date.toIso8601String()).toList(),
+    );
+
+    final endDateEntries = periodEndDates.entries
+        .map((entry) => '${entry.key}|${entry.value.toIso8601String()}')
+        .toList();
+
+    await prefs.setStringList('period_end_dates', endDateEntries);
 
     await prefs.setStringList('symptoms', symptoms.toList());
+  }
 
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Tracking entry saved successfully!')),
+  Future<void> _selectPeriodDate() async {
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: latestPeriod ?? today,
+      firstDate: DateTime(2000),
+      lastDate: today,
     );
+
+    if (selectedDate == null) return;
+
+    setState(() {
+      final exists = periodHistory.any(
+        (date) =>
+            date.year == selectedDate.year &&
+            date.month == selectedDate.month &&
+            date.day == selectedDate.day,
+      );
+
+      if (!exists) {
+        periodHistory.add(selectedDate);
+        periodHistory.sort((a, b) => b.compareTo(a));
+      }
+    });
+
+    await _saveTrackingData();
+  }
+
+  Future<void> _selectPeriodEndDate(DateTime startDate) async {
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: periodEndDates[startDate.toIso8601String()] ?? startDate,
+      firstDate: startDate,
+      lastDate: today,
+    );
+
+    if (selectedDate == null) return;
+
+    setState(() {
+      periodEndDates[startDate.toIso8601String()] = selectedDate;
+    });
+
+    await _saveTrackingData();
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   @override
@@ -588,87 +813,219 @@ class _TrackingScreenState extends State<TrackingScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Cycle Tracking')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Track your cycle',
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+              'Period Tracking',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 8),
 
-            Text(
-              'Record information to understand your patterns.',
-              style: TextStyle(color: Colors.grey.shade700),
-            ),
-
-            const SizedBox(height: 28),
-
             const Text(
-              'Period started?',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              'Record your period dates to understand your cycle patterns.',
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 24),
 
-            OutlinedButton.icon(
-              onPressed: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: periodStart ?? DateTime.now(),
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now(),
-                );
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Latest Period',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
 
-                if (date != null) {
-                  setState(() {
-                    periodStart = date;
-                  });
-                }
-              },
-              icon: const Icon(Icons.calendar_today),
-              label: Text(
-                periodStart == null
-                    ? 'Select date'
-                    : '${periodStart!.day}/${periodStart!.month}/${periodStart!.year}',
+                    const SizedBox(height: 12),
+
+                    Text(
+                      latestPeriod == null
+                          ? 'No period date recorded'
+                          : _formatDate(latestPeriod!),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    ElevatedButton(
+                      onPressed: _selectPeriodDate,
+                      child: const Text('Add Period Date'),
+                    ),
+                  ],
+                ),
               ),
             ),
 
-            const SizedBox(height: 30),
+            const SizedBox(height: 16),
 
-            const Text(
-              'Symptoms',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            if (latestPeriod != null)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Cycle Information',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
 
-            const SizedBox(height: 8),
+                      const SizedBox(height: 12),
 
-            ...symptomOptions.map(
-              (symptom) => CheckboxListTile(
-                title: Text(symptom),
-                value: symptoms.contains(symptom),
-                onChanged: (value) {
-                  setState(() {
-                    if (value == true) {
-                      symptoms.add(symptom);
-                    } else {
-                      symptoms.remove(symptom);
-                    }
-                  });
-                },
-                contentPadding: EdgeInsets.zero,
+                      Text('Current cycle day: $cycleDay'),
+
+                      const SizedBox(height: 8),
+
+                      if (latestPeriod != null &&
+                          periodEndDates[latestPeriod!.toIso8601String()] !=
+                              null)
+                        Text(
+                          'Latest period duration: '
+                          '${periodEndDates[latestPeriod!.toIso8601String()]!.difference(latestPeriod!).inDays + 1} days',
+                        ),
+
+                      const SizedBox(height: 8),
+
+                      Text(
+                        averageCycleLength == null
+                            ? 'Average cycle length: Not enough data'
+                            : 'Average cycle length: ${averageCycleLength!.round()} days',
+                      ),
+                      const SizedBox(height: 8),
+
+                      Text(
+                        nextPeriodDate == null
+                            ? 'Estimated next period: Not available'
+                            : 'Estimated next period: ${_formatDate(nextPeriodDate!)}',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            const SizedBox(height: 16),
+
+            if (periodHistory.isNotEmpty)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Period History',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      ...periodHistory.map((date) {
+                        final endDate = periodEndDates[date.toIso8601String()];
+
+                        final duration = endDate == null
+                            ? null
+                            : endDate.difference(date).inDays + 1;
+
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Started: ${_formatDate(date)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+
+                              const SizedBox(height: 4),
+
+                              if (endDate != null)
+                                Text(
+                                  'Ended: ${_formatDate(endDate)} • Duration: $duration days',
+                                )
+                              else
+                                TextButton(
+                                  onPressed: () => _selectPeriodEndDate(date),
+                                  child: const Text('Add end date'),
+                                ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+
+            const SizedBox(height: 16),
+
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Symptoms',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    ...symptomOptions.map(
+                      (symptom) => CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(symptom),
+                        value: symptoms.contains(symptom),
+                        onChanged: (value) async {
+                          setState(() {
+                            if (value == true) {
+                              symptoms.add(symptom);
+                            } else {
+                              symptoms.remove(symptom);
+                            }
+                          });
+
+                          await _saveTrackingData();
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
             SizedBox(
               width: double.infinity,
-              height: 52,
               child: ElevatedButton(
-                onPressed: _saveTrackingData,
+                onPressed: () async {
+                  await _saveTrackingData();
+
+                  if (!mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Tracking data saved')),
+                  );
+                },
                 child: const Text('Save Entry'),
               ),
             ),
@@ -691,6 +1048,10 @@ class _InsightsScreenState extends State<InsightsScreen> {
   List<String> cycleSymptoms = [];
   String? mood;
   List<String> checkInSymptoms = [];
+  List<DateTime> periodHistory = [];
+  List<int> cycleLengths = [];
+  double? averageCycleLength;
+  int? cycleVariation;
 
   @override
   void initState() {
@@ -701,20 +1062,44 @@ class _InsightsScreenState extends State<InsightsScreen> {
   Future<void> _loadInsights() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final savedDate = prefs.getString('period_start');
-    final savedCycleSymptoms =
-        prefs.getStringList('symptoms') ?? [];
-
+    final savedDates = prefs.getStringList('period_history') ?? [];
     final savedMood = prefs.getString('checkin_mood');
-    final savedCheckInSymptoms =
-        prefs.getStringList('checkin_symptoms') ?? [];
+    final savedCycleSymptoms = prefs.getStringList('symptoms') ?? [];
+    final savedCheckInSymptoms = prefs.getStringList('checkin_symptoms') ?? [];
+
+    final dates = savedDates
+        .map((date) => DateTime.tryParse(date))
+        .whereType<DateTime>()
+        .toList();
+
+    dates.sort((a, b) => a.compareTo(b));
+
+    final lengths = <int>[];
+
+    for (int i = 1; i < dates.length; i++) {
+      lengths.add(dates[i].difference(dates[i - 1]).inDays);
+    }
+
+    double? average;
+    int? variation;
+
+    if (lengths.isNotEmpty) {
+      average = lengths.reduce((a, b) => a + b) / lengths.length;
+
+      variation =
+          lengths.reduce((a, b) => a > b ? a : b) -
+          lengths.reduce((a, b) => a < b ? a : b);
+    }
 
     if (!mounted) return;
 
     setState(() {
-      if (savedDate != null) {
-        periodStart = DateTime.tryParse(savedDate);
-      }
+      periodHistory = dates;
+      periodStart = dates.isNotEmpty ? dates.last : null;
+
+      cycleLengths = lengths;
+      averageCycleLength = average;
+      cycleVariation = variation;
 
       cycleSymptoms = savedCycleSymptoms;
       mood = savedMood;
@@ -733,19 +1118,14 @@ class _InsightsScreenState extends State<InsightsScreen> {
           children: [
             const Text(
               'Your Insights',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 8),
 
             Text(
               'Patterns based on the information you track.',
-              style: TextStyle(
-                color: Colors.grey.shade700,
-              ),
+              style: TextStyle(color: Colors.grey.shade700),
             ),
 
             const SizedBox(height: 24),
@@ -783,9 +1163,9 @@ class _InsightsScreenState extends State<InsightsScreen> {
                             periodStart == null
                                 ? 'No period data recorded yet.'
                                 : 'Last period started on '
-                                    '${periodStart!.day}/'
-                                    '${periodStart!.month}/'
-                                    '${periodStart!.year}.',
+                                      '${periodStart!.day}/'
+                                      '${periodStart!.month}/'
+                                      '${periodStart!.year}.',
                           ),
 
                           if (cycleSymptoms.isNotEmpty) ...[
@@ -793,9 +1173,72 @@ class _InsightsScreenState extends State<InsightsScreen> {
                             Text(
                               'Recorded symptoms: '
                               '${cycleSymptoms.join(', ')}.',
-                              style: TextStyle(
-                                color: Colors.grey.shade700,
-                              ),
+                              style: TextStyle(color: Colors.grey.shade700),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Cycle Pattern
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.insights_outlined,
+                      size: 40,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+
+                    const SizedBox(width: 16),
+
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Cycle Pattern',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          if (averageCycleLength == null)
+                            const Text(
+                              'Track at least two periods to see your cycle pattern here.',
+                            )
+                          else ...[
+                            Text(
+                              'Average recorded cycle: '
+                              '${averageCycleLength!.round()} days.',
+                            ),
+
+                            const SizedBox(height: 6),
+
+                            Text(
+                              'Recorded cycles: '
+                              '${cycleLengths.join(', ')} days.',
+                            ),
+
+                            const SizedBox(height: 6),
+
+                            Text(
+                              cycleVariation! <= 7
+                                  ? 'Your recorded cycle lengths have been relatively consistent.'
+                                  : 'Your recorded cycle lengths have varied by '
+                                        '$cycleVariation days.',
                             ),
                           ],
                         ],
@@ -841,7 +1284,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
                             checkInSymptoms.isEmpty
                                 ? 'No check-in symptoms recorded yet.'
                                 : 'Latest symptoms: '
-                                    '${checkInSymptoms.join(', ')}.',
+                                      '${checkInSymptoms.join(', ')}.',
                           ),
                         ],
                       ),
@@ -899,10 +1342,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
 
             const Text(
               'Important',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 8),
@@ -910,10 +1350,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
             Text(
               'These insights are for awareness and tracking only '
               'and are not a medical diagnosis.',
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                height: 1.4,
-              ),
+              style: TextStyle(color: Colors.grey.shade700, height: 1.4),
             ),
           ],
         ),
@@ -944,17 +1381,12 @@ class EducationScreen extends StatefulWidget {
 class EducationDetailScreen extends StatelessWidget {
   final EducationTopic topic;
 
-  const EducationDetailScreen({
-    super.key,
-    required this.topic,
-  });
+  const EducationDetailScreen({super.key, required this.topic});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(topic.title),
-      ),
+      appBar: AppBar(title: Text(topic.title)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -962,20 +1394,14 @@ class EducationDetailScreen extends StatelessWidget {
           children: [
             Text(
               topic.title,
-              style: const TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 16),
 
             Text(
               topic.content,
-              style: const TextStyle(
-                fontSize: 16,
-                height: 1.6,
-              ),
+              style: const TextStyle(fontSize: 16, height: 1.6),
             ),
 
             const SizedBox(height: 24),
@@ -1238,9 +1664,7 @@ class _EducationScreenState extends State<EducationScreen> {
     final topics = getTopics();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Learn'),
-      ),
+      appBar: AppBar(title: const Text('Learn')),
       body: ListView.builder(
         padding: const EdgeInsets.all(20),
         itemCount: topics.length,
@@ -1253,24 +1677,18 @@ class _EducationScreenState extends State<EducationScreen> {
               contentPadding: const EdgeInsets.all(16),
               title: Text(
                 topic.title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               subtitle: Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(topic.description),
               ),
-              trailing: const Icon(
-                Icons.arrow_forward_ios,
-                size: 18,
-              ),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 18),
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) =>
-                        EducationDetailScreen(topic: topic),
+                    builder: (context) => EducationDetailScreen(topic: topic),
                   ),
                 );
               },
@@ -1297,6 +1715,7 @@ class _MainNavigationState extends State<MainNavigation> {
     TrackingScreen(),
     InsightsScreen(),
     EducationScreen(),
+    ChatScreen(),
   ];
 
   @override
@@ -1330,6 +1749,11 @@ class _MainNavigationState extends State<MainNavigation> {
             icon: Icon(Icons.menu_book_outlined),
             selectedIcon: Icon(Icons.menu_book),
             label: 'Learn',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.chat_bubble_outline),
+            selectedIcon: Icon(Icons.chat_bubble),
+            label: 'Ask',
           ),
         ],
       ),
