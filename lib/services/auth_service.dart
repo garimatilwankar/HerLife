@@ -39,22 +39,42 @@ class AuthService {
 
   static String _newSalt() {
     final random = Random.secure();
-    return base64Url.encode(List<int>.generate(16, (_) => random.nextInt(256)));
+
+    return base64Url.encode(
+      List<int>.generate(
+        16,
+        (_) => random.nextInt(256),
+      ),
+    );
   }
 
   static String _hash(String password, String salt) {
     List<int> bytes = utf8.encode('$salt:$password');
+
     for (var i = 0; i < 1000; i++) {
       bytes = sha256.convert(bytes).bytes;
     }
+
     return base64Url.encode(bytes);
   }
 
-  static Map<String, dynamic> _readAccounts(SharedPreferences prefs) {
+  static Map<String, dynamic> _readAccounts(
+    SharedPreferences prefs,
+  ) {
     final raw = prefs.getString(_accountsKey);
-    if (raw == null) return {};
-    return Map<String, dynamic>.from(jsonDecode(raw) as Map);
+
+    if (raw == null) {
+      return {};
+    }
+
+    return Map<String, dynamic>.from(
+      jsonDecode(raw) as Map,
+    );
   }
+
+  // -------------------------
+  // SIGN UP
+  // -------------------------
 
   static Future<AuthResult> signUp({
     required String name,
@@ -65,11 +85,17 @@ class AuthService {
     final cleanEmail = _normalize(email);
 
     if (cleanName.isEmpty) {
-      return const AuthResult.failure('Please enter your name.');
+      return const AuthResult.failure(
+        'Please enter your name.',
+      );
     }
+
     if (!_emailPattern.hasMatch(cleanEmail)) {
-      return const AuthResult.failure('Please enter a valid email address.');
+      return const AuthResult.failure(
+        'Please enter a valid email address.',
+      );
     }
+
     if (password.length < 8) {
       return const AuthResult.failure(
         'Your password needs at least 8 characters.',
@@ -86,61 +112,199 @@ class AuthService {
     }
 
     final salt = _newSalt();
+
     accounts[cleanEmail] = {
       'name': cleanName,
       'salt': salt,
       'hash': _hash(password, salt),
     };
 
-    await prefs.setString(_accountsKey, jsonEncode(accounts));
+    await prefs.setString(
+      _accountsKey,
+      jsonEncode(accounts),
+    );
 
     // A new account starts fresh so it goes through stage selection.
     for (final key in _userDataKeys) {
       await prefs.remove(key);
     }
-    await prefs.setString('consent_at', DateTime.now().toIso8601String());
-    await prefs.setString(_sessionKey, cleanEmail);
+
+    await prefs.setString(
+      'consent_at',
+      DateTime.now().toIso8601String(),
+    );
+
+    await prefs.setString(
+      _sessionKey,
+      cleanEmail,
+    );
 
     return const AuthResult.success();
   }
+
+  // -------------------------
+  // LOGIN
+  // -------------------------
 
   static Future<AuthResult> logIn({
     required String email,
     required String password,
   }) async {
     final cleanEmail = _normalize(email);
+
     final prefs = await SharedPreferences.getInstance();
     final accounts = _readAccounts(prefs);
     final account = accounts[cleanEmail];
 
-    const failure = AuthResult.failure('Email or password is incorrect.');
+    const failure = AuthResult.failure(
+      'Email or password is incorrect.',
+    );
 
-    if (account == null) return failure;
+    if (account == null) {
+      return failure;
+    }
 
     final salt = account['salt'] as String;
-    if (_hash(password, salt) != account['hash']) return failure;
 
-    await prefs.setString(_sessionKey, cleanEmail);
+    if (_hash(password, salt) != account['hash']) {
+      return failure;
+    }
+
+    await prefs.setString(
+      _sessionKey,
+      cleanEmail,
+    );
+
     return const AuthResult.success();
   }
 
+  // -------------------------
+  // LOGOUT
+  // -------------------------
+
   static Future<void> logOut() async {
     final prefs = await SharedPreferences.getInstance();
+
     await prefs.remove(_sessionKey);
   }
 
+  // -------------------------
+  // SESSION CHECK
+  // -------------------------
+
   static Future<bool> isLoggedIn() async {
     final prefs = await SharedPreferences.getInstance();
+
     final email = prefs.getString(_sessionKey);
-    if (email == null) return false;
+
+    if (email == null) {
+      return false;
+    }
+
     return _readAccounts(prefs).containsKey(email);
   }
 
+  // -------------------------
+  // CURRENT USER NAME
+  // -------------------------
+
   static Future<String?> currentName() async {
     final prefs = await SharedPreferences.getInstance();
+
     final email = prefs.getString(_sessionKey);
-    if (email == null) return null;
+
+    if (email == null) {
+      return null;
+    }
+
     final account = _readAccounts(prefs)[email];
-    return account == null ? null : account['name'] as String?;
+
+    return account == null
+        ? null
+        : account['name'] as String?;
+  }
+
+  // -------------------------
+  // CURRENT USER EMAIL
+  // -------------------------
+
+  static Future<String?> currentEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    return prefs.getString(_sessionKey);
+  }
+
+  // -------------------------
+  // UPDATE PROFILE
+  // -------------------------
+
+  static Future<AuthResult> updateProfile({
+    required String name,
+    required String email,
+  }) async {
+    final cleanName = name.trim();
+    final cleanEmail = _normalize(email);
+
+    if (cleanName.isEmpty) {
+      return const AuthResult.failure(
+        'Please enter your name.',
+      );
+    }
+
+    if (!_emailPattern.hasMatch(cleanEmail)) {
+      return const AuthResult.failure(
+        'Please enter a valid email address.',
+      );
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+
+    final currentEmail = prefs.getString(_sessionKey);
+
+    if (currentEmail == null) {
+      return const AuthResult.failure(
+        'No active session found.',
+      );
+    }
+
+    final accounts = _readAccounts(prefs);
+
+    final account = accounts[currentEmail];
+
+    if (account == null) {
+      return const AuthResult.failure(
+        'Account not found.',
+      );
+    }
+
+    // Prevent changing the email to one already registered.
+    if (cleanEmail != currentEmail &&
+        accounts.containsKey(cleanEmail)) {
+      return const AuthResult.failure(
+        'An account with this email already exists.',
+      );
+    }
+
+    // Remove the old email entry.
+    accounts.remove(currentEmail);
+
+    // Update the user's name.
+    account['name'] = cleanName;
+
+    // Save account under the new email.
+    accounts[cleanEmail] = account;
+
+    await prefs.setString(
+      _accountsKey,
+      jsonEncode(accounts),
+    );
+
+    // Update active session.
+    await prefs.setString(
+      _sessionKey,
+      cleanEmail,
+    );
+
+    return const AuthResult.success();
   }
 }
