@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:herlife/screens/auth_screens.dart';
-import 'package:herlife/screens/chat_screen.dart';
 import 'package:herlife/services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:herlife/screens/tabs/home_tab.dart';
+import 'package:herlife/screens/tabs/track_tab.dart';
+import 'package:herlife/screens/tabs/insights_tab.dart';
+import 'package:herlife/screens/tabs/learn_tab.dart';
+import 'package:herlife/screens/tabs/ask_tab.dart';
 
 void main() {
   runApp(const HerLifeApp());
@@ -1711,11 +1715,11 @@ class _MainNavigationState extends State<MainNavigation> {
   int currentIndex = 0;
 
   final List<Widget> screens = const [
-    DashboardScreen(),
-    TrackingScreen(),
-    InsightsScreen(),
-    EducationScreen(),
-    ChatScreen(),
+    HomeTab(),
+    TrackTab(),
+    InsightsTab(),
+    LearnTab(),
+    AskTab(),
   ];
 
   @override
