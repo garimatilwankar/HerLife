@@ -1,61 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:herlife/screens/tabs/ui.dart';
-
-class _Topic {
-  final String title, tag, hint;
-  final IconData icon;
-  final List<String> points;
-  const _Topic(this.title, this.tag, this.hint, this.icon, this.points);
-}
-
-const _topics = [
-  _Topic('Cycle basics', 'Cycle', 'How cycles are counted', Icons.loop, [
-    'Count from day 1 of one period to day 1 of the next',
-    'Most adult cycles are 21 to 35 days',
-    'Periods usually last 2 to 7 days',
-    'Small changes month to month are normal',
-  ]),
-  _Topic('Cycle phases', 'Cycle', 'Four phases explained', Icons.spa_outlined, [
-    'Menstrual: bleeding days',
-    'Follicular: body prepares an egg',
-    'Ovulation: egg is released',
-    'Luteal: body prepares for next period',
-  ]),
-  _Topic('Irregular periods', 'Cycle', 'Common causes', Icons.shuffle, [
-    'Stress, sleep and weight changes',
-    'Illness or some medicines',
-    'Common in the first years and near menopause',
-    'See a clinician if several periods are missed',
-  ]),
-  _Topic('Cramps', 'Symptoms', 'What helps', Icons.healing_outlined, [
-    'Mild to moderate cramps are common',
-    'Heat, rest and gentle movement help many people',
-    'Severe or worsening pain needs a clinician',
-  ]),
-  _Topic('Heavy periods', 'Symptoms', 'When to get checked', Icons.water_drop_outlined, [
-    'Soaking a pad or tampon every hour for hours',
-    'Clots larger than a coin',
-    'Bleeding longer than 7 days',
-    'Can cause low iron and tiredness',
-  ]),
-  _Topic('PMS', 'Symptoms', 'Before your period', Icons.mood_outlined, [
-    'Mood changes, bloating, tender breasts',
-    'Usually ease once bleeding starts',
-    'Severe mood symptoms deserve support',
-  ]),
-  _Topic('Pregnancy care', 'Life stages', 'Warning signs', Icons.pregnant_woman, [
-    'Severe headache or vision changes',
-    'Bleeding or belly pain',
-    'Less movement from the baby',
-    'Contact your provider promptly',
-  ]),
-  _Topic('Perimenopause', 'Life stages', 'The transition', Icons.timelapse, [
-    'Often starts in the 40s',
-    'Cycles become less predictable',
-    'Hot flashes, sleep and mood changes',
-    'Tracking helps your clinician',
-  ]),
-];
+import 'package:herlife/services/education_service.dart';
+import 'package:herlife/services/profile_service.dart';
+import 'package:herlife/models/api_models.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LearnTab extends StatefulWidget {
   const LearnTab({super.key});
@@ -67,41 +15,125 @@ class LearnTab extends StatefulWidget {
 class _LearnTabState extends State<LearnTab> {
   String _tag = 'All';
   String _query = '';
+  bool _isLoading = true;
+  List<EducationResponse> _articles = [];
+  String? _userLifecycleStage;
 
-  void _open(_Topic t) {
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+
+    // Get active lifecycle stage from ProfileService or SharedPreferences
+    final profile = await ProfileService.getProfile();
+    final prefs = await SharedPreferences.getInstance();
+    final stage = profile?.lifecycleStage ?? prefs.getString('lifecycle_stage');
+
+    _userLifecycleStage = stage;
+
+    // Fetch lifecycle-aware articles from backend
+    final fetched = await EducationService.getArticles(lifecycleStage: stage);
+
+    if (!mounted) return;
+    setState(() {
+      _articles = fetched;
+      _isLoading = false;
+    });
+  }
+
+  IconData _getIconForArticle(EducationResponse article) {
+    final cat = article.category.toLowerCase();
+    if (cat.contains('cycle')) return Icons.loop;
+    if (cat.contains('symptom')) return Icons.healing_outlined;
+    if (article.title.toLowerCase().contains('perimenopause') ||
+        article.title.toLowerCase().contains('menopause')) {
+      return Icons.timelapse;
+    }
+    return Icons.spa_outlined;
+  }
+
+  void _openArticle(EducationResponse article) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(t.title,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        maxChildSize: 0.9,
+        minChildSize: 0.4,
+        builder: (context, scrollController) => Padding(
+          padding: const EdgeInsets.all(24),
+          child: ListView(
+            controller: scrollController,
+            children: [
+              Text(
+                article.title,
                 style: const TextStyle(
-                    fontSize: 22, fontWeight: FontWeight.bold, color: kWine)),
-            const SizedBox(height: 14),
-            for (final p in t.points)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(top: 6),
-                        child: Icon(Icons.circle, size: 7, color: kWine),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(p)),
-                    ]),
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: kWine,
+                ),
               ),
-            const SizedBox(height: 4),
-            const Text('Information only, not a diagnosis',
-                style: TextStyle(fontSize: 12, color: Colors.black45)),
-          ],
+              const SizedBox(height: 8),
+              if (article.category.isNotEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: kBlush,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      article.category,
+                      style: const TextStyle(fontSize: 12, color: kWine, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 14),
+              if (article.summary != null && article.summary!.isNotEmpty) ...[
+                Text(
+                  article.summary!,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+              Text(
+                article.content,
+                style: const TextStyle(fontSize: 14, height: 1.5),
+              ),
+              const SizedBox(height: 20),
+              if (article.sourceName != null && article.sourceName!.isNotEmpty) ...[
+                Text(
+                  'Source: ${article.sourceName}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.black54,
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              const Divider(),
+              const SizedBox(height: 4),
+              const Text(
+                'Information only, not a diagnosis',
+                style: TextStyle(fontSize: 12, color: Colors.black45),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -109,73 +141,134 @@ class _LearnTabState extends State<LearnTab> {
 
   @override
   Widget build(BuildContext context) {
-    final shown = _topics.where((t) {
-      final tagOk = _tag == 'All' || t.tag == _tag;
+    final shown = _articles.where((art) {
+      final tagOk = _tag == 'All' || art.category.toLowerCase() == _tag.toLowerCase();
       final q = _query.toLowerCase();
-      return tagOk && (q.isEmpty || t.title.toLowerCase().contains(q));
+      final queryOk = q.isEmpty ||
+          art.title.toLowerCase().contains(q) ||
+          (art.summary != null && art.summary!.toLowerCase().contains(q));
+      return tagOk && queryOk;
     }).toList();
 
     return Scaffold(
       backgroundColor: kBg,
       body: SafeArea(
-        child: ListView(padding: const EdgeInsets.all(20), children: [
-          const ScreenTitle('Learn'),
-          const SizedBox(height: 14),
-          TextField(
-            onChanged: (v) => setState(() => _query = v),
-            decoration: InputDecoration(
-              hintText: 'Search topics',
-              prefixIcon: const Icon(Icons.search),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
+        child: RefreshIndicator(
+          onRefresh: _loadData,
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const ScreenTitle('Learn'),
+                  if (_userLifecycleStage != null && _userLifecycleStage!.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: kBlush,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _userLifecycleStage!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: kWine,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: [
-              for (final tag in ['All', 'Cycle', 'Symptoms', 'Life stages'])
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Pill(tag,
-                      selected: _tag == tag,
-                      onTap: () => setState(() => _tag = tag)),
-                ),
-            ]),
-          ),
-          const SizedBox(height: 14),
-          if (shown.isEmpty) const Center(child: Text('No topics found')),
-          for (final t in shown)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: AppCard(
-                onTap: () => _open(t),
-                child: Row(children: [
-                  CircleAvatar(
-                      backgroundColor: kBlush,
-                      child: Icon(t.icon, color: kWine, size: 20)),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(t.title,
-                              style: const TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.bold)),
-                          Text(t.hint,
-                              style: const TextStyle(
-                                  fontSize: 13, color: Colors.black54)),
-                        ]),
+              const SizedBox(height: 14),
+              TextField(
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(
+                  hintText: 'Search topics',
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
                   ),
-                  const Icon(Icons.chevron_right),
-                ]),
+                ),
               ),
-            ),
-        ]),
+              const SizedBox(height: 12),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final tag in ['All', 'Cycle', 'Symptoms', 'Life stages'])
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Pill(
+                          tag,
+                          selected: _tag == tag,
+                          onTap: () => setState(() => _tag = tag),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 40),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (shown.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 40),
+                  child: Center(child: Text('No topics found')),
+                )
+              else
+                for (final art in shown)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: AppCard(
+                      onTap: () => _openArticle(art),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: kBlush,
+                            child: Icon(_getIconForArticle(art), color: kWine, size: 20),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  art.title,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (art.summary != null && art.summary!.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    art.summary!,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right),
+                        ],
+                      ),
+                    ),
+                  ),
+            ],
+          ),
+        ),
       ),
     );
   }

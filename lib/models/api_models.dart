@@ -168,3 +168,41 @@ class InsightsResponse {
     );
   }
 }
+
+class EducationResponse {
+  final int id;
+  final String title;
+  final String? summary;
+  final String content;
+  final String category;
+  final String? lifecycleStage;
+  final String? sourceName;
+  final String? sourceUrl;
+  final DateTime createdAt;
+
+  const EducationResponse({
+    required this.id,
+    required this.title,
+    this.summary,
+    required this.content,
+    required this.category,
+    this.lifecycleStage,
+    this.sourceName,
+    this.sourceUrl,
+    required this.createdAt,
+  });
+
+  factory EducationResponse.fromJson(Map<String, dynamic> json) {
+    return EducationResponse(
+      id: json['id'] as int,
+      title: json['title'] as String,
+      summary: json['summary'] as String?,
+      content: json['content'] as String,
+      category: json['category'] as String,
+      lifecycleStage: json['lifecycle_stage'] as String?,
+      sourceName: json['source_name'] as String?,
+      sourceUrl: json['source_url'] as String?,
+      createdAt: DateTime.parse(json['created_at'] as String),
+    );
+  }
+}

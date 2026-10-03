@@ -3,6 +3,7 @@ import 'package:herlife/screens/auth_screens.dart';
 import 'package:herlife/services/auth_service.dart';
 import 'package:herlife/services/profile_service.dart';
 import 'package:herlife/services/tracking_service.dart';
+import 'package:herlife/services/education_service.dart';
 import 'package:herlife/models/api_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:herlife/screens/tabs/home_tab.dart';
@@ -1291,265 +1292,74 @@ class EducationDetailScreen extends StatelessWidget {
 
 class _EducationScreenState extends State<EducationScreen> {
   String? lifecycleStage;
+  List<EducationResponse> _articles = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadLifecycleStage();
+    _loadData();
   }
 
-  Future<void> _loadLifecycleStage() async {
+  Future<void> _loadData() async {
+    final profile = await ProfileService.getProfile();
     final prefs = await SharedPreferences.getInstance();
-    final savedStage = prefs.getString('lifecycle_stage');
+    final stage = profile?.lifecycleStage ?? prefs.getString('lifecycle_stage');
+
+    final fetched = await EducationService.getArticles(lifecycleStage: stage);
 
     if (!mounted) return;
-
     setState(() {
-      lifecycleStage = savedStage;
+      lifecycleStage = stage;
+      _articles = fetched;
+      _isLoading = false;
     });
-  }
-
-  List<EducationTopic> getTopics() {
-    switch (lifecycleStage) {
-      case 'Adolescence':
-        return [
-          const EducationTopic(
-            title: 'Understanding Puberty',
-            description: 'Learn about physical and hormonal changes.',
-            content:
-                'Puberty is a natural stage of development involving '
-                'physical, emotional and hormonal changes.',
-          ),
-          const EducationTopic(
-            title: 'Period Basics',
-            description: 'Understand menstrual cycles and period care.',
-            content:
-                'Menstruation is a normal part of the menstrual cycle. '
-                'Tracking your cycle can help you understand your patterns.',
-          ),
-          const EducationTopic(
-            title: 'Healthy Habits',
-            description: 'Learn about habits that support wellbeing.',
-            content:
-                'Balanced nutrition, regular movement, adequate sleep '
-                'and personal hygiene support overall wellbeing.',
-          ),
-        ];
-
-      case 'Menstruation':
-        return [
-          const EducationTopic(
-            title: 'Understanding Your Menstrual Cycle',
-            description: 'Learn how the menstrual cycle works.',
-            content:
-                'The menstrual cycle involves hormonal changes that '
-                'prepare the body for a possible pregnancy.',
-          ),
-          const EducationTopic(
-            title: 'Period Health',
-            description: 'Learn about common period symptoms.',
-            content:
-                'Cramps, fatigue, bloating and mood changes can occur '
-                'during the menstrual cycle.',
-          ),
-          const EducationTopic(
-            title: 'Tracking Your Period',
-            description: 'Understand why tracking can be useful.',
-            content:
-                'Tracking dates, symptoms and mood can help you identify '
-                'your own patterns over time.',
-          ),
-        ];
-
-      case 'Reproductive Health':
-        return [
-          const EducationTopic(
-            title: 'Reproductive Health',
-            description: 'Understand important aspects of reproductive health.',
-            content:
-                'Reproductive health includes physical, emotional and '
-                'social wellbeing related to the reproductive system.',
-          ),
-          const EducationTopic(
-            title: 'Hormonal Changes',
-            description: 'Learn how hormones affect the body.',
-            content:
-                'Hormones influence many processes including the menstrual '
-                'cycle, mood and reproductive functions.',
-          ),
-          const EducationTopic(
-            title: 'When to Seek Help',
-            description: 'Know when professional guidance may be useful.',
-            content:
-                'Persistent, severe or concerning symptoms should be '
-                'discussed with a qualified healthcare professional.',
-          ),
-        ];
-
-      case 'Pregnancy':
-        return [
-          const EducationTopic(
-            title: 'Understanding Pregnancy',
-            description: 'Learn about changes during pregnancy.',
-            content:
-                'Pregnancy involves many physical and hormonal changes '
-                'as the body supports fetal development.',
-          ),
-          const EducationTopic(
-            title: 'Pregnancy Wellbeing',
-            description: 'Learn about general wellbeing during pregnancy.',
-            content:
-                'Nutrition, rest, appropriate activity and regular '
-                'professional care are important during pregnancy.',
-          ),
-          const EducationTopic(
-            title: 'When to Seek Help',
-            description: 'Understand when professional care is important.',
-            content:
-                'New, severe or concerning symptoms during pregnancy '
-                'should be discussed promptly with a healthcare professional.',
-          ),
-        ];
-
-      case 'Postpartum':
-        return [
-          const EducationTopic(
-            title: 'Postpartum Changes',
-            description: 'Understand changes after childbirth.',
-            content:
-                'The postpartum period involves physical, hormonal and '
-                'emotional changes while the body recovers from childbirth.',
-          ),
-          const EducationTopic(
-            title: 'Postpartum Wellbeing',
-            description: 'Learn about supporting recovery and wellbeing.',
-            content:
-                'Rest, nutrition, support and appropriate healthcare '
-                'can help during postpartum recovery.',
-          ),
-          const EducationTopic(
-            title: 'When to Seek Help',
-            description: 'Know when professional support may be needed.',
-            content:
-                'Persistent or concerning physical or emotional symptoms '
-                'should be discussed with a healthcare professional.',
-          ),
-        ];
-
-      case 'Perimenopause':
-        return [
-          const EducationTopic(
-            title: 'Understanding Perimenopause',
-            description: 'Learn about the transition toward menopause.',
-            content:
-                'Perimenopause is a transitional stage in which hormonal '
-                'changes can affect menstrual cycles and other symptoms.',
-          ),
-          const EducationTopic(
-            title: 'Common Changes',
-            description: 'Learn about changes that may occur.',
-            content:
-                'Changes in periods, sleep, mood and body temperature '
-                'can occur during perimenopause.',
-          ),
-          const EducationTopic(
-            title: 'Tracking Symptoms',
-            description: 'Understand how tracking can help.',
-            content:
-                'Recording symptoms and cycle changes can help you '
-                'understand patterns over time.',
-          ),
-        ];
-
-      case 'Menopause':
-        return [
-          const EducationTopic(
-            title: 'Understanding Menopause',
-            description: 'Learn about menopause and hormonal changes.',
-            content:
-                'Menopause marks the end of menstrual periods and is '
-                'associated with changes in reproductive hormones.',
-          ),
-          const EducationTopic(
-            title: 'Common Symptoms',
-            description: 'Learn about changes that may occur.',
-            content:
-                'Some people experience changes such as hot flashes, '
-                'sleep changes or mood changes around menopause.',
-          ),
-          const EducationTopic(
-            title: 'Healthy Habits',
-            description: 'Learn about supporting overall wellbeing.',
-            content:
-                'Regular movement, balanced nutrition, adequate sleep '
-                'and healthcare support overall wellbeing.',
-          ),
-        ];
-
-      default:
-        return [
-          const EducationTopic(
-            title: 'Understanding Your Menstrual Cycle',
-            description: 'Learn how the menstrual cycle works.',
-            content:
-                'The menstrual cycle involves hormonal changes that '
-                'prepare the body for a possible pregnancy.',
-          ),
-          const EducationTopic(
-            title: 'Period Health',
-            description: 'Learn about common period symptoms.',
-            content:
-                'Tracking your period and symptoms can help you '
-                'understand your personal patterns.',
-          ),
-          const EducationTopic(
-            title: 'When to Seek Help',
-            description: 'Know when professional guidance may be useful.',
-            content:
-                'Persistent, severe or concerning symptoms should be '
-                'discussed with a qualified healthcare professional.',
-          ),
-        ];
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final topics = getTopics();
-
     return Scaffold(
       appBar: AppBar(title: const Text('Learn')),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(20),
-        itemCount: topics.length,
-        itemBuilder: (context, index) {
-          final topic = topics[index];
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _articles.isEmpty
+              ? const Center(child: Text('No topics found'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(20),
+                  itemCount: _articles.length,
+                  itemBuilder: (context, index) {
+                    final article = _articles[index];
+                    final topic = EducationTopic(
+                      title: article.title,
+                      description: article.summary ?? '',
+                      content: article.content,
+                    );
 
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              contentPadding: const EdgeInsets.all(16),
-              title: Text(
-                topic.title,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              subtitle: Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(topic.description),
-              ),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 18),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => EducationDetailScreen(topic: topic),
-                  ),
-                );
-              },
-            ),
-          );
-        },
-      ),
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(16),
+                        title: Text(
+                          topic.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(topic.description),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 18),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EducationDetailScreen(topic: topic),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
     );
   }
 }
