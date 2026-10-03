@@ -28,3 +28,9 @@ DerivedData/
 
 # Generated files
 *.log
+
+# Python
+backend/venv/
+backend/.venv/
+__pycache__/
+*.py[cod]
