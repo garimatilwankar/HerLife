@@ -10,6 +10,7 @@ from app.routers.tracking import router as tracking_router
 from app.routers.lifecycle import router as lifecycle_router
 from app.routers.insights import router as insights_router
 from app.routers.education import router as education_router
+from app.routers.ask import router as ask_router
 
 
 Base.metadata.create_all(bind=engine)
@@ -36,6 +37,7 @@ app.include_router(tracking_router)
 app.include_router(lifecycle_router)
 app.include_router(insights_router)
 app.include_router(education_router)
+app.include_router(ask_router)
 
 
 @app.get("/")

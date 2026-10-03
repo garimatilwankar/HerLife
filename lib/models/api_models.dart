@@ -206,3 +206,76 @@ class EducationResponse {
     );
   }
 }
+
+class AskRequest {
+  final String question;
+
+  const AskRequest({required this.question});
+
+  Map<String, dynamic> toJson() => {
+        'question': question,
+      };
+}
+
+class AskSourceResponse {
+  final int id;
+  final String title;
+  final String? summary;
+  final String category;
+  final String? lifecycleStage;
+  final String? sourceName;
+  final String? sourceUrl;
+
+  const AskSourceResponse({
+    required this.id,
+    required this.title,
+    this.summary,
+    required this.category,
+    this.lifecycleStage,
+    this.sourceName,
+    this.sourceUrl,
+  });
+
+  factory AskSourceResponse.fromJson(Map<String, dynamic> json) {
+    return AskSourceResponse(
+      id: json['id'] as int,
+      title: json['title'] as String,
+      summary: json['summary'] as String?,
+      category: json['category'] as String,
+      lifecycleStage: json['lifecycle_stage'] as String?,
+      sourceName: json['source_name'] as String?,
+      sourceUrl: json['source_url'] as String?,
+    );
+  }
+}
+
+class AskResponse {
+  final String question;
+  final String intent;
+  final String safetyLevel;
+  final String answer;
+  final List<AskSourceResponse> sources;
+  final String disclaimer;
+
+  const AskResponse({
+    required this.question,
+    this.intent = 'GENERAL_INFORMATION',
+    this.safetyLevel = 'INFORMATIONAL',
+    required this.answer,
+    required this.sources,
+    required this.disclaimer,
+  });
+
+  factory AskResponse.fromJson(Map<String, dynamic> json) {
+    return AskResponse(
+      question: json['question'] as String,
+      intent: json['intent'] as String? ?? 'GENERAL_INFORMATION',
+      safetyLevel: json['safety_level'] as String? ?? 'INFORMATIONAL',
+      answer: json['answer'] as String,
+      sources: (json['sources'] as List? ?? [])
+          .map((item) => AskSourceResponse.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      disclaimer: json['disclaimer'] as String,
+    );
+  }
+}
