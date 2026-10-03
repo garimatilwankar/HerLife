@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:herlife/models/api_models.dart';
 import 'package:herlife/services/auth_service.dart';
+import 'package:herlife/services/profile_service.dart';
+import 'package:herlife/services/tracking_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const kWine = Color(0xFF7E2A3C);
@@ -80,45 +83,109 @@ class ScreenTitle extends StatelessWidget {
 class HerData {
   List<DateTime> periods = []; // newest first
   Map<String, DateTime> ends = {};
+  Map<String, int> periodIds = {};
   List<String> symptoms = [], checkInSymptoms = [];
   String? mood, stage, name;
 
   static Future<HerData> load() async {
-    final p = await SharedPreferences.getInstance();
     final d = HerData();
-    d.periods = (p.getStringList('period_history') ?? [])
-        .map(DateTime.tryParse)
-        .whereType<DateTime>()
+
+    // 1. Fetch periods from backend
+    final backendPeriods = await TrackingService.getPeriods();
+    d.periods = backendPeriods
+        .map((p) => DateTime(p.startDate.year, p.startDate.month, p.startDate.day))
         .toList()
       ..sort((a, b) => b.compareTo(a));
-    for (final e in p.getStringList('period_end_dates') ?? []) {
-      final parts = e.split('|');
-      final end = parts.length == 2 ? DateTime.tryParse(parts[1]) : null;
-      if (end != null) d.ends[parts[0]] = end;
+
+    for (final p in backendPeriods) {
+      final startKey = DateTime(p.startDate.year, p.startDate.month, p.startDate.day).toIso8601String();
+      d.periodIds[startKey] = p.id;
+      if (p.endDate != null) {
+        d.ends[startKey] = DateTime(p.endDate!.year, p.endDate!.month, p.endDate!.day);
+      }
     }
-    d.symptoms = p.getStringList('symptoms') ?? [];
-    d.checkInSymptoms = p.getStringList('checkin_symptoms') ?? [];
-    d.mood = p.getString('checkin_mood');
-    d.stage = p.getString('lifecycle_stage');
+
+    // 2. Fetch symptoms from backend
+    final backendSymptoms = await TrackingService.getSymptoms();
+    d.symptoms = backendSymptoms.map((s) => s.name).toSet().toList();
+
+    // 3. Fetch checkins from backend
+    final backendCheckins = await TrackingService.getCheckins();
+    if (backendCheckins.isNotEmpty) {
+      d.mood = backendCheckins.first.mood;
+      if (backendCheckins.first.notes != null) {
+        d.checkInSymptoms = backendCheckins.first.notes!
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
+      }
+    }
+
+    // 4. Fetch profile and user details
+    final profile = await ProfileService.getProfile();
+    final p = await SharedPreferences.getInstance();
+
+    d.stage = profile?.lifecycleStage ?? p.getString('lifecycle_stage');
     d.name = await AuthService.currentName();
+
+    // Sync SharedPreferences local cache for offline reliability
+    if (d.periods.isNotEmpty) {
+      await p.setStringList(
+        'period_history',
+        d.periods.map((date) => date.toIso8601String()).toList(),
+      );
+    }
+    final endDateEntries = d.ends.entries
+        .map((entry) => '${entry.key}|${entry.value.toIso8601String()}')
+        .toList();
+    await p.setStringList('period_end_dates', endDateEntries);
+    if (d.symptoms.isNotEmpty) {
+      await p.setStringList('symptoms', d.symptoms);
+    }
+    if (d.mood != null) {
+      await p.setString('checkin_mood', d.mood!);
+    }
+
     return d;
   }
 
   static Future<void> addPeriod(DateTime date) async {
+    final cleanDate = DateTime(date.year, date.month, date.day);
+    await TrackingService.createPeriod(cleanDate);
+
     final p = await SharedPreferences.getInstance();
     final list = p.getStringList('period_history') ?? [];
-    final iso = DateTime(date.year, date.month, date.day).toIso8601String();
+    final iso = cleanDate.toIso8601String();
     if (!list.contains(iso)) list.add(iso);
     await p.setStringList('period_history', list);
   }
 
   static Future<void> setEnd(DateTime start, DateTime end) async {
+    final cleanStart = DateTime(start.year, start.month, start.day);
+    final cleanEnd = DateTime(end.year, end.month, end.day);
+    final startKey = cleanStart.toIso8601String();
+
+    final backendPeriods = await TrackingService.getPeriods();
+    final existing = backendPeriods.firstWhere(
+      (p) =>
+          p.startDate.year == cleanStart.year &&
+          p.startDate.month == cleanStart.month &&
+          p.startDate.day == cleanStart.day,
+      orElse: () => PeriodResponse(id: -1, startDate: cleanStart),
+    );
+
+    if (existing.id != -1) {
+      await TrackingService.updatePeriod(existing.id, cleanStart, endDate: cleanEnd);
+    } else {
+      await TrackingService.createPeriod(cleanStart, endDate: cleanEnd);
+    }
+
     final p = await SharedPreferences.getInstance();
-    final key = start.toIso8601String();
     final list = (p.getStringList('period_end_dates') ?? [])
-        .where((e) => !e.startsWith('$key|'))
+        .where((e) => !e.startsWith('$startKey|'))
         .toList()
-      ..add('$key|${end.toIso8601String()}');
+      ..add('$startKey|${cleanEnd.toIso8601String()}');
     await p.setStringList('period_end_dates', list);
   }
 

@@ -5,6 +5,8 @@ import 'package:herlife/services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:herlife/main.dart' show AppGate;
 
+import 'package:herlife/services/profile_service.dart';
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -30,17 +32,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadProfile() async {
-    final prefs = await SharedPreferences.getInstance();
-
     final savedName = await AuthService.currentName();
     final savedEmail = await AuthService.currentEmail();
+    final profile = await ProfileService.getProfile();
+    final prefs = await SharedPreferences.getInstance();
 
     if (!mounted) return;
 
     setState(() {
       name = savedName;
       email = savedEmail;
-      lifecycleStage = prefs.getString('lifecycle_stage');
+      lifecycleStage = profile?.lifecycleStage ?? prefs.getString('lifecycle_stage');
       notifications = prefs.getBool('notifications_enabled') ?? true;
       anonymousTelemetry =
           prefs.getBool('anonymous_telemetry_enabled') ?? false;

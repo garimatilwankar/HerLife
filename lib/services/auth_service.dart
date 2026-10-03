@@ -1,7 +1,7 @@
-import 'dart:convert';
-import 'dart:math';
-
-import 'package:crypto/crypto.dart';
+import 'package:dio/dio.dart';
+import 'package:herlife/core/network/api_client.dart';
+import 'package:herlife/models/api_models.dart';
+import 'package:herlife/services/token_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthResult {
@@ -17,11 +17,10 @@ class AuthResult {
         error = message;
 }
 
-/// Local stand-in for the real backend. When FastAPI + Firebase Auth are
-/// ready, keep these method signatures and replace the bodies.
+/// Authentication service connected to FastAPI backend APIs.
 class AuthService {
-  static const _accountsKey = 'auth_accounts';
-  static const _sessionKey = 'auth_session_email';
+  static const _sessionEmailKey = 'auth_session_email';
+  static const _sessionNameKey = 'auth_session_name';
 
   static const _userDataKeys = [
     'lifecycle_stage',
@@ -37,40 +36,8 @@ class AuthService {
 
   static String _normalize(String email) => email.trim().toLowerCase();
 
-  static String _newSalt() {
-    final random = Random.secure();
-
-    return base64Url.encode(
-      List<int>.generate(
-        16,
-        (_) => random.nextInt(256),
-      ),
-    );
-  }
-
-  static String _hash(String password, String salt) {
-    List<int> bytes = utf8.encode('$salt:$password');
-
-    for (var i = 0; i < 1000; i++) {
-      bytes = sha256.convert(bytes).bytes;
-    }
-
-    return base64Url.encode(bytes);
-  }
-
-  static Map<String, dynamic> _readAccounts(
-    SharedPreferences prefs,
-  ) {
-    final raw = prefs.getString(_accountsKey);
-
-    if (raw == null) {
-      return {};
-    }
-
-    return Map<String, dynamic>.from(
-      jsonDecode(raw) as Map,
-    );
-  }
+  static String? _cachedName;
+  static String? _cachedEmail;
 
   // -------------------------
   // SIGN UP
@@ -85,15 +52,11 @@ class AuthService {
     final cleanEmail = _normalize(email);
 
     if (cleanName.isEmpty) {
-      return const AuthResult.failure(
-        'Please enter your name.',
-      );
+      return const AuthResult.failure('Please enter your name.');
     }
 
     if (!_emailPattern.hasMatch(cleanEmail)) {
-      return const AuthResult.failure(
-        'Please enter a valid email address.',
-      );
+      return const AuthResult.failure('Please enter a valid email address.');
     }
 
     if (password.length < 8) {
@@ -102,44 +65,36 @@ class AuthService {
       );
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final accounts = _readAccounts(prefs);
+    try {
+      final dio = ApiClient().dio;
 
-    if (accounts.containsKey(cleanEmail)) {
-      return const AuthResult.failure(
-        'An account with this email already exists. Try logging in.',
+      // 1. Register account
+      await dio.post(
+        '/api/auth/register',
+        data: {
+          'name': cleanName,
+          'email': cleanEmail,
+          'password': password,
+        },
       );
+
+      // Clear previous local tracking data for fresh user startup
+      final prefs = await SharedPreferences.getInstance();
+      for (final key in _userDataKeys) {
+        await prefs.remove(key);
+      }
+      await prefs.setString(
+        'consent_at',
+        DateTime.now().toIso8601String(),
+      );
+
+      // 2. Automatically log in after registration to obtain JWT token
+      return await logIn(email: cleanEmail, password: password);
+    } on DioException catch (e) {
+      return AuthResult.failure(ApiClient.formatError(e));
+    } catch (e) {
+      return AuthResult.failure('Registration failed. Please try again.');
     }
-
-    final salt = _newSalt();
-
-    accounts[cleanEmail] = {
-      'name': cleanName,
-      'salt': salt,
-      'hash': _hash(password, salt),
-    };
-
-    await prefs.setString(
-      _accountsKey,
-      jsonEncode(accounts),
-    );
-
-    // A new account starts fresh so it goes through stage selection.
-    for (final key in _userDataKeys) {
-      await prefs.remove(key);
-    }
-
-    await prefs.setString(
-      'consent_at',
-      DateTime.now().toIso8601String(),
-    );
-
-    await prefs.setString(
-      _sessionKey,
-      cleanEmail,
-    );
-
-    return const AuthResult.success();
   }
 
   // -------------------------
@@ -152,30 +107,47 @@ class AuthService {
   }) async {
     final cleanEmail = _normalize(email);
 
-    final prefs = await SharedPreferences.getInstance();
-    final accounts = _readAccounts(prefs);
-    final account = accounts[cleanEmail];
-
-    const failure = AuthResult.failure(
-      'Email or password is incorrect.',
-    );
-
-    if (account == null) {
-      return failure;
+    if (cleanEmail.isEmpty || password.isEmpty) {
+      return const AuthResult.failure('Please enter email and password.');
     }
 
-    final salt = account['salt'] as String;
+    try {
+      final dio = ApiClient().dio;
 
-    if (_hash(password, salt) != account['hash']) {
-      return failure;
+      // Form data format expected by OAuth2PasswordRequestForm
+      final formData = FormData.fromMap({
+        'username': cleanEmail,
+        'password': password,
+      });
+
+      final response = await dio.post(
+        '/api/auth/login',
+        data: formData,
+        options: Options(
+          contentType: Headers.formUrlEncodedContentType,
+        ),
+      );
+
+      final tokenData = TokenResponse.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+
+      // Save token securely
+      await TokenStorageService.saveToken(tokenData.accessToken);
+
+      // Validate session & populate user metadata
+      final isValid = await validateSession();
+
+      if (!isValid) {
+        return const AuthResult.failure('Could not retrieve user session.');
+      }
+
+      return const AuthResult.success();
+    } on DioException catch (e) {
+      return AuthResult.failure(ApiClient.formatError(e));
+    } catch (e) {
+      return AuthResult.failure('Login failed. Please try again.');
     }
-
-    await prefs.setString(
-      _sessionKey,
-      cleanEmail,
-    );
-
-    return const AuthResult.success();
   }
 
   // -------------------------
@@ -183,25 +155,57 @@ class AuthService {
   // -------------------------
 
   static Future<void> logOut() async {
-    final prefs = await SharedPreferences.getInstance();
+    await TokenStorageService.clearToken();
+    _cachedName = null;
+    _cachedEmail = null;
 
-    await prefs.remove(_sessionKey);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_sessionEmailKey);
+    await prefs.remove(_sessionNameKey);
   }
 
   // -------------------------
-  // SESSION CHECK
+  // SESSION CHECK & VALIDATION
   // -------------------------
 
+  /// Quick local check if a token exists.
   static Future<bool> isLoggedIn() async {
-    final prefs = await SharedPreferences.getInstance();
+    return await TokenStorageService.hasToken();
+  }
 
-    final email = prefs.getString(_sessionKey);
-
-    if (email == null) {
+  /// Single-pass session validation on app startup via GET /api/auth/me.
+  /// If valid, caches user information. If 401/invalid, purges token and returns false.
+  static Future<bool> validateSession() async {
+    final hasToken = await TokenStorageService.hasToken();
+    if (!hasToken) {
+      await logOut();
       return false;
     }
 
-    return _readAccounts(prefs).containsKey(email);
+    try {
+      final dio = ApiClient().dio;
+      final response = await dio.get('/api/auth/me');
+
+      final user = UserResponse.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+
+      _cachedName = user.name;
+      _cachedEmail = user.email;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_sessionNameKey, user.name);
+      await prefs.setString(_sessionEmailKey, user.email);
+
+      return true;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        await logOut();
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
   }
 
   // -------------------------
@@ -209,19 +213,12 @@ class AuthService {
   // -------------------------
 
   static Future<String?> currentName() async {
+    if (_cachedName != null) return _cachedName;
+
     final prefs = await SharedPreferences.getInstance();
+    _cachedName = prefs.getString(_sessionNameKey);
 
-    final email = prefs.getString(_sessionKey);
-
-    if (email == null) {
-      return null;
-    }
-
-    final account = _readAccounts(prefs)[email];
-
-    return account == null
-        ? null
-        : account['name'] as String?;
+    return _cachedName;
   }
 
   // -------------------------
@@ -229,9 +226,12 @@ class AuthService {
   // -------------------------
 
   static Future<String?> currentEmail() async {
-    final prefs = await SharedPreferences.getInstance();
+    if (_cachedEmail != null) return _cachedEmail;
 
-    return prefs.getString(_sessionKey);
+    final prefs = await SharedPreferences.getInstance();
+    _cachedEmail = prefs.getString(_sessionEmailKey);
+
+    return _cachedEmail;
   }
 
   // -------------------------
@@ -246,64 +246,19 @@ class AuthService {
     final cleanEmail = _normalize(email);
 
     if (cleanName.isEmpty) {
-      return const AuthResult.failure(
-        'Please enter your name.',
-      );
+      return const AuthResult.failure('Please enter your name.');
     }
 
     if (!_emailPattern.hasMatch(cleanEmail)) {
-      return const AuthResult.failure(
-        'Please enter a valid email address.',
-      );
+      return const AuthResult.failure('Please enter a valid email address.');
     }
+
+    _cachedName = cleanName;
+    _cachedEmail = cleanEmail;
 
     final prefs = await SharedPreferences.getInstance();
-
-    final currentEmail = prefs.getString(_sessionKey);
-
-    if (currentEmail == null) {
-      return const AuthResult.failure(
-        'No active session found.',
-      );
-    }
-
-    final accounts = _readAccounts(prefs);
-
-    final account = accounts[currentEmail];
-
-    if (account == null) {
-      return const AuthResult.failure(
-        'Account not found.',
-      );
-    }
-
-    // Prevent changing the email to one already registered.
-    if (cleanEmail != currentEmail &&
-        accounts.containsKey(cleanEmail)) {
-      return const AuthResult.failure(
-        'An account with this email already exists.',
-      );
-    }
-
-    // Remove the old email entry.
-    accounts.remove(currentEmail);
-
-    // Update the user's name.
-    account['name'] = cleanName;
-
-    // Save account under the new email.
-    accounts[cleanEmail] = account;
-
-    await prefs.setString(
-      _accountsKey,
-      jsonEncode(accounts),
-    );
-
-    // Update active session.
-    await prefs.setString(
-      _sessionKey,
-      cleanEmail,
-    );
+    await prefs.setString(_sessionNameKey, cleanName);
+    await prefs.setString(_sessionEmailKey, cleanEmail);
 
     return const AuthResult.success();
   }

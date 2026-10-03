@@ -1,6 +1,8 @@
 import 'package:herlife/main.dart' show MainNavigation;
 import 'package:flutter/material.dart';
+import 'package:herlife/services/profile_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 class LifecycleScreen extends StatefulWidget {
   const LifecycleScreen({super.key});
 
@@ -10,6 +12,7 @@ class LifecycleScreen extends StatefulWidget {
 
 class _LifecycleScreenState extends State<LifecycleScreen> {
   String? selectedStage;
+  bool saving = false;
 
   final stages = [
     'Adolescence',
@@ -28,8 +31,9 @@ class _LifecycleScreenState extends State<LifecycleScreen> {
   }
 
   Future<void> _loadLifecycleStage() async {
+    final profile = await ProfileService.getProfile();
     final prefs = await SharedPreferences.getInstance();
-    final savedStage = prefs.getString('lifecycle_stage');
+    final savedStage = profile?.lifecycleStage ?? prefs.getString('lifecycle_stage');
 
     if (!mounted) return;
 
@@ -39,13 +43,23 @@ class _LifecycleScreenState extends State<LifecycleScreen> {
   }
 
   Future<void> _saveLifecycleStage() async {
-    if (selectedStage == null) return;
+    if (selectedStage == null || saving) return;
 
-    final prefs = await SharedPreferences.getInstance();
+    setState(() => saving = true);
 
-    await prefs.setString('lifecycle_stage', selectedStage!);
+    final result = await ProfileService.updateProfile(
+      lifecycleStage: selectedStage,
+    );
 
     if (!mounted) return;
+
+    if (!result.ok) {
+      setState(() => saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.error ?? 'Failed to save health stage.')),
+      );
+      return;
+    }
 
     Navigator.pushReplacement(
       context,
@@ -136,8 +150,14 @@ class _LifecycleScreenState extends State<LifecycleScreen> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: selectedStage == null ? null : _saveLifecycleStage,
-                  child: const Text('Continue', style: TextStyle(fontSize: 16)),
+                  onPressed: selectedStage == null || saving ? null : _saveLifecycleStage,
+                  child: saving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Continue', style: TextStyle(fontSize: 16)),
                 ),
               ),
             ],

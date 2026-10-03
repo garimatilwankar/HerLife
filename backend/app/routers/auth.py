@@ -32,9 +32,10 @@ def register(
     data: RegisterRequest,
     db: Session = Depends(get_db),
 ):
+    clean_email = data.email.strip().lower()
     existing_user = db.scalar(
         select(User).where(
-            User.email == data.email.lower()
+            User.email == clean_email
         )
     )
 
@@ -46,7 +47,7 @@ def register(
 
     user = User(
         name=data.name.strip(),
-        email=data.email.lower(),
+        email=clean_email,
         password_hash=hash_password(data.password),
     )
 
@@ -65,9 +66,10 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
+    clean_username = form_data.username.strip().lower()
     user = db.scalar(
         select(User).where(
-            User.email == form_data.username.lower()
+            User.email == clean_username
         )
     )
 
@@ -76,7 +78,7 @@ def login(
         user.password_hash,
     ):
         raise HTTPException(
-            status_code=401,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email or password is incorrect.",
         )
 

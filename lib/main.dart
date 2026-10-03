@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:herlife/screens/auth_screens.dart';
 import 'package:herlife/services/auth_service.dart';
+import 'package:herlife/services/profile_service.dart';
+import 'package:herlife/services/tracking_service.dart';
+import 'package:herlife/models/api_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:herlife/screens/tabs/home_tab.dart';
 import 'package:herlife/screens/tabs/track_tab.dart';
@@ -8,6 +11,8 @@ import 'package:herlife/screens/tabs/insights_tab.dart';
 import 'package:herlife/screens/tabs/learn_tab.dart';
 import 'package:herlife/screens/tabs/ask_tab.dart';
 import 'package:herlife/screens/lifecycle_screen.dart';
+
+import 'package:herlife/core/network/api_client.dart';
 
 void main() {
   runApp(const HerLifeApp());
@@ -46,11 +51,20 @@ class _AppGateState extends State<AppGate> {
   @override
   void initState() {
     super.initState();
+    ApiClient().onUnauthorized = () {
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+          (route) => false,
+        );
+      }
+    };
     _destination = _decide();
   }
 
   Future<Widget> _decide() async {
-    if (!await AuthService.isLoggedIn()) return const WelcomeScreen();
+    final isValidSession = await AuthService.validateSession();
+    if (!isValidSession) return const WelcomeScreen();
 
     final prefs = await SharedPreferences.getInstance();
     final stage = prefs.getString('lifecycle_stage');
@@ -214,33 +228,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadTrackingData() async {
+    final backendPeriods = await TrackingService.getPeriods();
+    final backendSymptoms = await TrackingService.getSymptoms();
+    final backendCheckins = await TrackingService.getCheckins();
+    final profile = await ProfileService.getProfile();
     final prefs = await SharedPreferences.getInstance();
 
-    final savedDates = prefs.getStringList('period_history') ?? [];
-    final savedSymptoms = prefs.getStringList('symptoms') ?? [];
-
-    final savedMood = prefs.getString('checkin_mood');
-    final savedCheckInSymptoms = prefs.getStringList('checkin_symptoms') ?? [];
-
-    final savedLifecycleStage = prefs.getString('lifecycle_stage');
     final savedName = await AuthService.currentName();
 
-    final parsedDates = savedDates
-        .map((date) => DateTime.tryParse(date))
-        .whereType<DateTime>()
-        .toList();
+    final parsedDates = backendPeriods
+        .map((p) => DateTime(p.startDate.year, p.startDate.month, p.startDate.day))
+        .toList()
+      ..sort((a, b) => b.compareTo(a));
 
-    parsedDates.sort((a, b) => b.compareTo(a));
+    final loadedSymptoms = backendSymptoms.map((s) => s.name).toSet().toList();
+    final loadedMood = backendCheckins.isNotEmpty ? backendCheckins.first.mood : prefs.getString('checkin_mood');
+    final loadedCheckInSymptoms = backendCheckins.isNotEmpty && backendCheckins.first.notes != null
+        ? backendCheckins.first.notes!.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList()
+        : (prefs.getStringList('checkin_symptoms') ?? []);
 
     if (!mounted) return;
 
     setState(() {
       periodStart = parsedDates.isNotEmpty ? parsedDates.first : null;
-
-      symptoms = savedSymptoms;
-      mood = savedMood;
-      checkInSymptoms = savedCheckInSymptoms;
-      lifecycleStage = savedLifecycleStage;
+      symptoms = loadedSymptoms;
+      mood = loadedMood;
+      checkInSymptoms = loadedCheckInSymptoms;
+      lifecycleStage = profile?.lifecycleStage ?? prefs.getString('lifecycle_stage');
       userName = savedName;
     });
   }
@@ -565,56 +579,29 @@ class _TrackingScreenState extends State<TrackingScreen> {
   }
 
   Future<void> _loadTrackingData() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    final savedDates = prefs.getStringList('period_history') ?? [];
-    final savedEndDates = prefs.getStringList('period_end_dates') ?? [];
+    final backendPeriods = await TrackingService.getPeriods();
+    final backendSymptoms = await TrackingService.getSymptoms();
 
     final loadedEndDates = <String, DateTime>{};
+    final parsedDates = <DateTime>[];
 
-    for (final entry in savedEndDates) {
-      final parts = entry.split('|');
-
-      if (parts.length == 2) {
-        final date = DateTime.tryParse(parts[1]);
-
-        if (date != null) {
-          loadedEndDates[parts[0]] = date;
-        }
+    for (final p in backendPeriods) {
+      final startDate = DateTime(p.startDate.year, p.startDate.month, p.startDate.day);
+      parsedDates.add(startDate);
+      if (p.endDate != null) {
+        loadedEndDates[startDate.toIso8601String()] = DateTime(p.endDate!.year, p.endDate!.month, p.endDate!.day);
       }
     }
+    parsedDates.sort((a, b) => b.compareTo(a));
+
+    if (!mounted) return;
 
     setState(() {
-      periodHistory = savedDates
-          .map((date) => DateTime.tryParse(date))
-          .whereType<DateTime>()
-          .toList();
-
-      periodHistory.sort((a, b) => b.compareTo(a));
-
+      periodHistory = parsedDates;
       periodEndDates = loadedEndDates;
-
-      symptoms.addAll(prefs.getStringList('symptoms') ?? []);
+      symptoms.clear();
+      symptoms.addAll(backendSymptoms.map((s) => s.name));
     });
-  }
-
-  Future<void> _saveTrackingData() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    periodHistory.sort((a, b) => b.compareTo(a));
-
-    await prefs.setStringList(
-      'period_history',
-      periodHistory.map((date) => date.toIso8601String()).toList(),
-    );
-
-    final endDateEntries = periodEndDates.entries
-        .map((entry) => '${entry.key}|${entry.value.toIso8601String()}')
-        .toList();
-
-    await prefs.setStringList('period_end_dates', endDateEntries);
-
-    await prefs.setStringList('symptoms', symptoms.toList());
   }
 
   Future<void> _selectPeriodDate() async {
@@ -627,21 +614,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     if (selectedDate == null) return;
 
-    setState(() {
-      final exists = periodHistory.any(
-        (date) =>
-            date.year == selectedDate.year &&
-            date.month == selectedDate.month &&
-            date.day == selectedDate.day,
-      );
-
-      if (!exists) {
-        periodHistory.add(selectedDate);
-        periodHistory.sort((a, b) => b.compareTo(a));
-      }
-    });
-
-    await _saveTrackingData();
+    await TrackingService.createPeriod(selectedDate);
+    await _loadTrackingData();
   }
 
   Future<void> _selectPeriodEndDate(DateTime startDate) async {
@@ -654,11 +628,22 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     if (selectedDate == null) return;
 
-    setState(() {
-      periodEndDates[startDate.toIso8601String()] = selectedDate;
-    });
+    final backendPeriods = await TrackingService.getPeriods();
+    final existing = backendPeriods.firstWhere(
+      (p) =>
+          p.startDate.year == startDate.year &&
+          p.startDate.month == startDate.month &&
+          p.startDate.day == startDate.day,
+      orElse: () => PeriodResponse(id: -1, startDate: startDate),
+    );
 
-    await _saveTrackingData();
+    if (existing.id != -1) {
+      await TrackingService.updatePeriod(existing.id, startDate, endDate: selectedDate);
+    } else {
+      await TrackingService.createPeriod(startDate, endDate: selectedDate);
+    }
+
+    await _loadTrackingData();
   }
 
   String _formatDate(DateTime date) {
@@ -852,6 +837,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                         title: Text(symptom),
                         value: symptoms.contains(symptom),
                         onChanged: (value) async {
+                          final now = DateTime.now();
                           setState(() {
                             if (value == true) {
                               symptoms.add(symptom);
@@ -860,7 +846,15 @@ class _TrackingScreenState extends State<TrackingScreen> {
                             }
                           });
 
-                          await _saveTrackingData();
+                          if (value == true) {
+                            await TrackingService.createSymptom(now, symptom);
+                          } else {
+                            final backendSymptoms = await TrackingService.getSymptoms();
+                            final toDelete = backendSymptoms.where((s) => s.name == symptom).toList();
+                            for (final s in toDelete) {
+                              await TrackingService.deleteSymptom(s.id);
+                            }
+                          }
                         },
                       ),
                     ),
@@ -875,7 +869,10 @@ class _TrackingScreenState extends State<TrackingScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () async {
-                  await _saveTrackingData();
+                  final now = DateTime.now();
+                  for (final s in symptoms) {
+                    await TrackingService.createSymptom(now, s);
+                  }
 
                   if (!mounted) return;
 
@@ -1646,22 +1643,38 @@ class _CheckInScreenState extends State<CheckInScreen> {
   }
 
   Future<void> _loadCheckInData() async {
+    final checkins = await TrackingService.getCheckins();
+    final backendSymptoms = await TrackingService.getSymptoms();
     final prefs = await SharedPreferences.getInstance();
 
-    final savedMood = prefs.getString('checkin_mood');
-    final savedSymptoms = prefs.getStringList('checkin_symptoms') ?? [];
+    final savedMood = checkins.isNotEmpty ? checkins.first.mood : prefs.getString('checkin_mood');
+    final loadedSymptoms = backendSymptoms.map((s) => s.name).toSet();
 
     if (!mounted) return;
 
     setState(() {
       mood = savedMood;
-      symptoms.addAll(savedSymptoms);
+      symptoms.clear();
+      symptoms.addAll(loadedSymptoms);
     });
   }
 
   Future<void> _saveCheckIn() async {
-    final prefs = await SharedPreferences.getInstance();
+    if (mood == null) return;
 
+    final now = DateTime.now();
+
+    await TrackingService.createCheckin(
+      now,
+      mood!,
+      notes: symptoms.isNotEmpty ? symptoms.join(', ') : null,
+    );
+
+    for (final symptom in symptoms) {
+      await TrackingService.createSymptom(now, symptom);
+    }
+
+    final prefs = await SharedPreferences.getInstance();
     await prefs.setString('checkin_mood', mood!);
     await prefs.setStringList('checkin_symptoms', symptoms.toList());
 
@@ -1670,6 +1683,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Check-in saved successfully!')),
     );
+
+    Navigator.pop(context);
   }
 
   @override

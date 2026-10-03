@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:herlife/models/api_models.dart';
 import 'package:herlife/screens/tabs/ui.dart';
+import 'package:herlife/services/insights_service.dart';
 
 class InsightsTab extends StatefulWidget {
   const InsightsTab({super.key});
@@ -10,12 +12,22 @@ class InsightsTab extends StatefulWidget {
 
 class _InsightsTabState extends State<InsightsTab> {
   HerData? d;
+  InsightsResponse? insights;
 
   @override
   void initState() {
     super.initState();
-    HerData.load().then((v) {
-      if (mounted) setState(() => d = v);
+    _loadInsights();
+  }
+
+  Future<void> _loadInsights() async {
+    final loadedData = await HerData.load();
+    final backendInsights = await InsightsService.getInsights();
+
+    if (!mounted) return;
+    setState(() {
+      d = loadedData;
+      insights = backendInsights;
     });
   }
 

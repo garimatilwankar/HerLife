@@ -1,6 +1,16 @@
 import os
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
+
+# Patch passlib compatibility with bcrypt 4.0+
+if not hasattr(bcrypt, "__about__"):
+    bcrypt.__about__ = type(
+        "About",
+        (),
+        {"__version__": getattr(bcrypt, "__version__", "4.0.0")},
+    )
+
 from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer

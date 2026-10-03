@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:herlife/services/auth_service.dart';
+import 'package:herlife/services/profile_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -54,25 +55,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    final prefs = await SharedPreferences.getInstance();
-
     final savedName = await AuthService.currentName();
     final savedEmail = await AuthService.currentEmail();
-
-    final savedDob = prefs.getString('date_of_birth');
+    final profile = await ProfileService.getProfile();
+    final prefs = await SharedPreferences.getInstance();
 
     if (!mounted) return;
 
     setState(() {
       nameController.text = savedName ?? '';
       emailController.text = savedEmail ?? '';
-      biologicalAssignment =
-          prefs.getString('biological_assignment');
-      lifecycleStage = prefs.getString('lifecycle_stage');
-
-      if (savedDob != null) {
-        dateOfBirth = DateTime.tryParse(savedDob);
-      }
+      biologicalAssignment = profile?.biologicalAssignment ?? prefs.getString('biological_assignment');
+      lifecycleStage = profile?.lifecycleStage ?? prefs.getString('lifecycle_stage');
+      dateOfBirth = profile?.dateOfBirth ??
+          (prefs.getString('date_of_birth') != null
+              ? DateTime.tryParse(prefs.getString('date_of_birth')!)
+              : null);
     });
   }
 
@@ -108,50 +106,36 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     setState(() => saving = true);
 
-    final result = await AuthService.updateProfile(
+    final authRes = await AuthService.updateProfile(
       name: name,
       email: email,
     );
 
-    if (!result.ok) {
+    if (!authRes.ok) {
       if (!mounted) return;
-
       setState(() => saving = false);
-
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.error ?? 'Unable to save profile.')),
+        SnackBar(content: Text(authRes.error ?? 'Unable to save user credentials.')),
       );
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-
-    if (dateOfBirth != null) {
-      await prefs.setString(
-        'date_of_birth',
-        dateOfBirth!.toIso8601String(),
-      );
-    } else {
-      await prefs.remove('date_of_birth');
-    }
-
-    if (biologicalAssignment != null) {
-      await prefs.setString(
-        'biological_assignment',
-        biologicalAssignment!,
-      );
-    }
-
-    if (lifecycleStage != null) {
-      await prefs.setString(
-        'lifecycle_stage',
-        lifecycleStage!,
-      );
-    }
+    final profileRes = await ProfileService.updateProfile(
+      dateOfBirth: dateOfBirth,
+      biologicalAssignment: biologicalAssignment,
+      lifecycleStage: lifecycleStage,
+    );
 
     if (!mounted) return;
 
     setState(() => saving = false);
+
+    if (!profileRes.ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(profileRes.error ?? 'Unable to save profile details.')),
+      );
+      return;
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
