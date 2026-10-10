@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey
+from sqlalchemy import Date, DateTime, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -24,3 +24,7 @@ class Period(Base):
         default=datetime.utcnow,
         nullable=False,
     )
+
+    __table_args__ = (
+        Index("idx_period_user_start", "user_id", "start_date"),
+    )

@@ -50,19 +50,25 @@ class _TrackTabState extends State<TrackTab> {
     _load();
   }
 
-  bool _isPeriod(HerData d, DateTime x) => d.periods.any((s) {
-        final e = d.ends[s.toIso8601String()] ?? s;
-        return !x.isBefore(s) && !x.isAfter(e);
-      });
-
   Widget _calendar(HerData d) {
     final now = d.today;
     final offset = DateTime(now.year, now.month, 1).weekday - 1;
     final count = DateTime(now.year, now.month + 1, 0).day;
     final next = d.next;
 
+    // Precompute set of ISO dates for period days to make calendar rendering O(1) per cell
+    final Set<String> periodIsoDates = {};
+    for (final s in d.periods) {
+      final e = d.ends[s.toIso8601String()] ?? s;
+      var curr = s;
+      while (!curr.isAfter(e)) {
+        periodIsoDates.add(DateTime(curr.year, curr.month, curr.day).toIso8601String());
+        curr = curr.add(const Duration(days: 1));
+      }
+    }
+
     final cells = <Widget>[
-      for (final l in ['M', 'T', 'W', 'T', 'F', 'S', 'S'])
+      for (final l in const ['M', 'T', 'W', 'T', 'F', 'S', 'S'])
         Center(
             child: Text(l,
                 style: const TextStyle(fontSize: 12, color: Colors.black54))),
@@ -70,7 +76,7 @@ class _TrackTabState extends State<TrackTab> {
       for (var day = 1; day <= count; day++)
         Builder(builder: (_) {
           final x = DateTime(now.year, now.month, day);
-          final period = _isPeriod(d, x);
+          final period = periodIsoDates.contains(x.toIso8601String());
           final predicted = next != null && x == next;
           final isToday = x == now;
           return Center(
@@ -154,7 +160,7 @@ class _TrackTabState extends State<TrackTab> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 90),
           children: [
-            const ScreenTitle('Track'),
+            const ScreenTitle('Track', showLogo: true),
             const SizedBox(height: 16),
             Row(children: [
               _stat('Cycle day', data.cycleDay > 0 ? '${data.cycleDay}' : '--'),

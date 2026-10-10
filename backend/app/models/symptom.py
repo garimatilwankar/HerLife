@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Date, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -25,3 +25,7 @@ class Symptom(Base):
         default=datetime.utcnow,
         nullable=False,
     )
+
+    __table_args__ = (
+        Index("idx_symptom_user_recorded", "user_id", "recorded_on"),
+    )

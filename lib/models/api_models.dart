@@ -207,13 +207,34 @@ class EducationResponse {
   }
 }
 
+class ChatMessageItem {
+  final String role;
+  final String content;
+
+  const ChatMessageItem({
+    required this.role,
+    required this.content,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'role': role,
+        'content': content,
+      };
+}
+
 class AskRequest {
   final String question;
+  final List<ChatMessageItem> conversationHistory;
 
-  const AskRequest({required this.question});
+  const AskRequest({
+    required this.question,
+    this.conversationHistory = const [],
+  });
 
   Map<String, dynamic> toJson() => {
         'question': question,
+        'conversation_history':
+            conversationHistory.map((item) => item.toJson()).toList(),
       };
 }
 

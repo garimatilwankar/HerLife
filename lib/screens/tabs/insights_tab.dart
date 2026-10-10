@@ -21,13 +21,15 @@ class _InsightsTabState extends State<InsightsTab> {
   }
 
   Future<void> _loadInsights() async {
-    final loadedData = await HerData.load();
-    final backendInsights = await InsightsService.getInsights();
+    final results = await Future.wait<dynamic>([
+      HerData.load(),
+      InsightsService.getInsights(),
+    ]);
 
     if (!mounted) return;
     setState(() {
-      d = loadedData;
-      insights = backendInsights;
+      d = results[0] as HerData;
+      insights = results[1] as InsightsResponse?;
     });
   }
 
@@ -119,7 +121,7 @@ class _InsightsTabState extends State<InsightsTab> {
       backgroundColor: kBg,
       body: SafeArea(
         child: ListView(padding: const EdgeInsets.all(20), children: [
-          const ScreenTitle('Insights'),
+          const ScreenTitle('Insights', showLogo: true),
           const SizedBox(height: 16),
           if (lengths.isEmpty)
             const AppCard(

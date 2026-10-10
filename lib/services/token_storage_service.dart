@@ -4,6 +4,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// Encrypts JWT access tokens in Android Keystore / iOS Keychain.
 class TokenStorageService {
   static const _tokenKey = 'jwt_access_token';
+  static String? _cachedToken;
+  static bool _isInitialized = false;
 
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(
@@ -16,16 +18,25 @@ class TokenStorageService {
 
   /// Saves the JWT access token to secure storage.
   static Future<void> saveToken(String token) async {
+    _cachedToken = token;
+    _isInitialized = true;
     await _storage.write(key: _tokenKey, value: token);
   }
 
   /// Retrieves the saved JWT access token, or null if none exists.
   static Future<String?> getToken() async {
-    return await _storage.read(key: _tokenKey);
+    if (_cachedToken != null) return _cachedToken;
+    if (!_isInitialized) {
+      _cachedToken = await _storage.read(key: _tokenKey);
+      _isInitialized = true;
+    }
+    return _cachedToken;
   }
 
   /// Clears the saved JWT access token from secure storage.
   static Future<void> clearToken() async {
+    _cachedToken = null;
+    _isInitialized = true;
     await _storage.delete(key: _tokenKey);
   }
 
@@ -35,3 +46,4 @@ class TokenStorageService {
     return token != null && token.isNotEmpty;
   }
 }
+

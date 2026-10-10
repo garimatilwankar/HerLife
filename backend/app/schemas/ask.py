@@ -1,8 +1,14 @@
 from pydantic import BaseModel, Field
 
 
+class ChatMessageItem(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+
 class AskRequest(BaseModel):
     question: str = Field(..., min_length=1)
+    conversation_history: list[ChatMessageItem] = Field(default_factory=list)
 
 
 class AskSourceSchema(BaseModel):

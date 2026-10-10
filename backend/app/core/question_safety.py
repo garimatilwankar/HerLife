@@ -6,6 +6,9 @@ INTENT_SYMPTOM = "SYMPTOM_INFORMATION"
 INTENT_MEDICATION = "MEDICATION / TREATMENT"
 INTENT_URGENT = "EMERGENCY / URGENT"
 INTENT_DIAGNOSIS = "DIAGNOSIS_REQUEST"
+INTENT_GREETING = "GREETING"
+INTENT_IDENTITY = "IDENTITY"
+INTENT_GENERAL_KNOWLEDGE = "GENERAL_KNOWLEDGE"
 INTENT_UNKNOWN = "OTHER / UNKNOWN"
 
 SAFETY_INFORMATIONAL = "INFORMATIONAL"
@@ -23,12 +26,34 @@ class SafetyClassification:
 
 # Urgent / Emergency patterns
 URGENT_PATTERNS = [
+    # Bleeding emergencies (heavy, severe, profuse, excessive, losing a lot of blood, soaking through)
     r"\b(severe|heavy|profuse|excessive)\s+bleeding\b",
-    r"\b(feel|feeling)\s+(faint|dizzy|lightheaded)\b",
-    r"\b(fainted|fainting|passed out|passing out|unconscious)\b",
-    r"\b(severe|unbearable|excruciating)\s+(abdominal|pelvic|stomach|period)\s+pain\b",
-    r"\b(chest pain|difficulty breathing|shortness of breath)\b",
-    r"\b(emergency|ambulance|call 911|hemorrhage|hemorrhaging)\b",
+    r"\b(losing|lost)\s+(a\s+lot\s+of|excessive|too\s+much)\s+blood\b",
+    r"\bbleeding\s+(a\s+lot|heavily|profusely|excessively)\b",
+    r"\bsoaking\s+through\s+(pads?|tampons?)\b",
+
+    # Fainting / Dizziness / Lightheadedness (allowing adverbs like feel extremely/very dizzy)
+    r"\b(feel|feeling|felt)\s+.*?\b(faint|dizzy|lightheaded)\b",
+    r"\b(fainted|fainting|passed\s+out|passing\s+out|unconscious|unconsciousness|blacked\s+out)\b",
+
+    # Combination: Bleeding + Dizziness/Fainting anywhere in input
+    r"\b(bleed|bleeding|blood)\b.*?\b(dizzy|faint|lightheaded)\b",
+    r"\b(dizzy|faint|lightheaded)\b.*?\b(bleed|bleeding|blood)\b",
+
+    # Severe Pain
+    r"\b(severe|unbearable|excruciating|intense|extreme)\s+.*?\b(pain|cramps?)\b",
+
+    # Respiratory / Chest Pain
+    r"\b(chest\s+pain|difficulty\s+breathing|shortness\s+of\s+breath|gasping\s+for\s+air)\b",
+
+    # Seizures / Convulsions
+    r"\b(seizure|seizures|convulsions|convulsing)\b",
+
+    # Self-harm / Crisis
+    r"\b(suicide|suicidal|kill\s+myself|end\s+my\s+life|self[- ]harm)\b",
+
+    # General Emergency
+    r"\b(emergency|ambulance|call\s+911|call\s+999|call\s+112|hemorrhage|hemorrhaging)\b",
 ]
 
 # Diagnosis patterns
@@ -47,9 +72,26 @@ MEDICATION_PATTERNS = [
     r"\bwhat (medicine|medication|drug|pill|painkiller) should i (take|use)\b",
     r"\bwhat (dosage|dose) should i take\b",
     r"\bhow (much|many) (ibuprofen|paracetamol|aspirin|naproxen|tylenol|advil|pills|tablets)\b",
-    r"\bshould i (start|stop|change|take|increase|decrease) (my|this|taking)? (medicine|medication|pill|treatment|prescription)\b",
-    r"\bwhich (medicine|medication|pill|painkiller) (helps|is best|is safe) for\b",
+    r"\bcan i take \d+.*?(ibuprofen|paracetamol|aspirin|naproxen|tylenol|advil|pills|tablets|mg|milligrams)\b",
+    r"\bshould i (start|stop|change|take|increase|decrease).*?(medicine|medication|pill|treatment|prescription)\b",
+    r"\bwhich (medicine|medication|pill|painkiller) (helps|is best|is safe)\b",
     r"\bprescribe\b",
+]
+
+# Greeting patterns
+GREETING_PATTERNS = [
+    r"^(hi|hello|hey|greetings|howdy|good morning|good afternoon|good evening|thanks|thank you|okay|got it|bye|goodbye|how are you|how s it going)[\!\.\?]*$",
+    r"^(hi|hello|hey)\s+(herlife|there|bot)[\!\.\?]*$",
+]
+
+# Identity patterns
+IDENTITY_PATTERNS = [
+    r"\b(who are you|what is your name|what are you|who created you|what can you do|what do you do)\b",
+]
+
+# General knowledge / Unrelated patterns
+GENERAL_KNOWLEDGE_PATTERNS = [
+    r"\b(capital of|who invented|tell me a joke|weather|sports|score|president|prime minister)\b",
 ]
 
 # Symptom patterns
@@ -69,6 +111,7 @@ GENERAL_PATTERNS = [
 def classify_question(question: str) -> SafetyClassification:
     """
     Deterministically classifies a user question into safety intents and risk levels.
+    Evaluated on EVERY turn before model generation.
     """
     q_lower = question.lower().strip()
 
@@ -111,7 +154,34 @@ def classify_question(question: str) -> SafetyClassification:
                 ),
             )
 
-    # 4. Symptom information check
+    # 4. Greeting check
+    for pattern in GREETING_PATTERNS:
+        if re.search(pattern, q_lower):
+            return SafetyClassification(
+                intent=INTENT_GREETING,
+                safety_level=SAFETY_INFORMATIONAL,
+                is_safe=True,
+            )
+
+    # 5. Identity check
+    for pattern in IDENTITY_PATTERNS:
+        if re.search(pattern, q_lower):
+            return SafetyClassification(
+                intent=INTENT_IDENTITY,
+                safety_level=SAFETY_INFORMATIONAL,
+                is_safe=True,
+            )
+
+    # 6. General knowledge / Unrelated check
+    for pattern in GENERAL_KNOWLEDGE_PATTERNS:
+        if re.search(pattern, q_lower):
+            return SafetyClassification(
+                intent=INTENT_GENERAL_KNOWLEDGE,
+                safety_level=SAFETY_INFORMATIONAL,
+                is_safe=True,
+            )
+
+    # 7. Symptom information check
     for pattern in SYMPTOM_PATTERNS:
         if re.search(pattern, q_lower):
             return SafetyClassification(
@@ -120,7 +190,7 @@ def classify_question(question: str) -> SafetyClassification:
                 is_safe=True,
             )
 
-    # 5. General information check
+    # 8. General information check
     for pattern in GENERAL_PATTERNS:
         if re.search(pattern, q_lower):
             return SafetyClassification(
@@ -129,7 +199,7 @@ def classify_question(question: str) -> SafetyClassification:
                 is_safe=True,
             )
 
-    # 6. Fallback
+    # 9. Fallback
     return SafetyClassification(
         intent=INTENT_UNKNOWN,
         safety_level=SAFETY_INFORMATIONAL,

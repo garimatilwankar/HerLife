@@ -3,6 +3,7 @@ import 'package:herlife/main.dart' show CheckInScreen;
 import 'package:herlife/screens/lifecycle_screen.dart';
 import 'package:herlife/screens/settings_screen.dart';
 import 'package:herlife/screens/tabs/ui.dart';
+import 'package:herlife/widgets/herlife_logo.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -182,19 +183,37 @@ class _HomeTabState extends State<HomeTab> {
             children: [
               Row(
                 children: [
+                  const HerLifeLogoMark(size: 32),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: ScreenTitle(
-                      'Hi, ${data.name ?? 'there'}',
-                      trailing: Pill(
-                        data.stage ?? 'Set stage',
-                        icon: Icons.favorite_border,
-                        onTap: () =>
-                            Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(
-                            builder: (_) => const LifecycleScreen(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Hi, ${data.name ?? 'there'}',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: kWine,
                           ),
-                          (r) => false,
                         ),
+                        Text(
+                          data.stage ?? 'HerLife Health Tracker',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Pill(
+                    data.stage ?? 'Set stage',
+                    icon: Icons.auto_awesome_outlined,
+                    onTap: () =>
+                        Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const LifecycleScreen(),
                       ),
                     ),
                   ),
@@ -224,19 +243,13 @@ class _HomeTabState extends State<HomeTab> {
                 children: [
                   _action(
                     Icons.water_drop_outlined,
-                    'Log period',
+                    'Log Period',
                     _logPeriod,
                   ),
                   const SizedBox(width: 10),
                   _action(
                     Icons.edit_calendar_outlined,
-                    'Check-in',
-                    _checkIn,
-                  ),
-                  const SizedBox(width: 10),
-                  _action(
-                    Icons.monitor_heart_outlined,
-                    'Symptoms',
+                    'Daily Check-in',
                     _checkIn,
                   ),
                 ],

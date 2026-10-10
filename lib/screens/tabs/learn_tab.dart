@@ -28,10 +28,17 @@ class _LearnTabState extends State<LearnTab> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
-    // Get active lifecycle stage from ProfileService or SharedPreferences
-    final profile = await ProfileService.getProfile();
-    final prefs = await SharedPreferences.getInstance();
-    final stage = profile?.lifecycleStage ?? prefs.getString('lifecycle_stage');
+    // Get active lifecycle stage from cached ProfileService or parallel fetch
+    String? stage = ProfileService.cachedProfile?.lifecycleStage;
+    if (stage == null) {
+      final results = await Future.wait<dynamic>([
+        ProfileService.getProfile(),
+        SharedPreferences.getInstance(),
+      ]);
+      final profile = results[0] as ProfileResponse?;
+      final prefs = results[1] as SharedPreferences;
+      stage = profile?.lifecycleStage ?? prefs.getString('lifecycle_stage');
+    }
 
     _userLifecycleStage = stage;
 
@@ -161,7 +168,7 @@ class _LearnTabState extends State<LearnTab> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const ScreenTitle('Learn'),
+                  const ScreenTitle('Learn', showLogo: true),
                   if (_userLifecycleStage != null && _userLifecycleStage!.isNotEmpty)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

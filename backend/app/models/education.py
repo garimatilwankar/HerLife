@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, Text
+from sqlalchemy import DateTime, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -13,7 +13,7 @@ class EducationArticle(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    category: Mapped[str] = mapped_column(String(100), nullable=False)
+    category: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     lifecycle_stage: Mapped[str | None] = mapped_column(
         String(50),
         nullable=True,
@@ -27,3 +27,8 @@ class EducationArticle(Base):
         default=datetime.utcnow,
         nullable=False,
     )
+
+    __table_args__ = (
+        Index("idx_education_stage_cat", "lifecycle_stage", "category"),
+    )
+

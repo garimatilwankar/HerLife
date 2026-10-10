@@ -4,7 +4,7 @@ import 'package:herlife/screens/lifecycle_screen.dart';
 import 'package:herlife/services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:herlife/main.dart' show AppGate;
-
+import 'package:herlife/widgets/herlife_logo.dart';
 import 'package:herlife/services/profile_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -186,21 +186,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: stage,
                   onTap: _changeLifecycleStage,
                 ),
-                _divider(),
-                _settingTile(
-                  icon: Icons.favorite_outline,
-                  title: 'Personal Vitals',
-                  subtitle: 'Date of birth and health profile',
-                  onTap: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const EditProfileScreen(),
-                      ),
-                    );
-                    _loadProfile();
-                  },
-                ),
               ],
             ),
 
@@ -323,11 +308,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
+
+            const Center(
+              child: HerLifeBrandLogo(
+                markSize: 36,
+                fontSize: 20,
+              ),
+            ),
+            const SizedBox(height: 8),
 
             const Center(
               child: Text(
-                'HerLife • Your health, your data, your journey.',
+                'Your health, your data, your journey.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12,

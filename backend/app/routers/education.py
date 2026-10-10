@@ -12,10 +12,18 @@ router = APIRouter(
 )
 
 
+_is_seeded = False
+
+
 def seed_education_data(db: Session):
     """Seed initial educational content if the education table is empty."""
+    global _is_seeded
+    if _is_seeded:
+        return
+
     existing_count = db.scalar(select(EducationArticle).limit(1))
     if existing_count is not None:
+        _is_seeded = True
         return
 
     articles = [
@@ -136,6 +144,7 @@ def seed_education_data(db: Session):
 
     db.add_all(articles)
     db.commit()
+    _is_seeded = True
 
 
 @router.get("", response_model=list[EducationResponse])

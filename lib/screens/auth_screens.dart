@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:herlife/main.dart';
 import 'package:herlife/services/auth_service.dart';
+import 'package:herlife/widgets/server_config_dialog.dart';
 
 void _enterApp(BuildContext context) {
   Navigator.of(context).pushAndRemoveUntil(
@@ -110,6 +111,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   _error!,
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
+                if (_error!.contains('Unable to reach HerLife server')) ...[
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: const Icon(Icons.settings_ethernet, size: 16),
+                      label: const Text('Configure Server URL', style: TextStyle(fontSize: 13)),
+                      onPressed: () => ServerConfigDialog.show(context),
+                    ),
+                  ),
+                ],
               ],
               const SizedBox(height: 24),
               SizedBox(

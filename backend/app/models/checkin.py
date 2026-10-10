@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -29,4 +29,5 @@ class DailyCheckin(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "recorded_on", name="unique_daily_checkin"),
-    )
+        Index("idx_checkin_user_recorded", "user_id", "recorded_on"),
+    )

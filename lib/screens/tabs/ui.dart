@@ -4,6 +4,7 @@ import 'package:herlife/services/auth_service.dart';
 import 'package:herlife/services/profile_service.dart';
 import 'package:herlife/services/tracking_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:herlife/widgets/herlife_logo.dart';
 
 const kWine = Color(0xFF7E2A3C);
 const kBlush = Color(0xFFFFD9DE);
@@ -66,16 +67,31 @@ class Pill extends StatelessWidget {
 class ScreenTitle extends StatelessWidget {
   final String title;
   final Widget? trailing;
-  const ScreenTitle(this.title, {super.key, this.trailing});
+  final bool showLogo;
+  const ScreenTitle(this.title, {super.key, this.trailing, this.showLogo = false});
 
   @override
   Widget build(BuildContext context) => Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 26, fontWeight: FontWeight.bold, color: kWine)),
-          if (trailing != null) trailing!,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showLogo) ...[
+                const HerLifeLogoMark(size: 26),
+                const SizedBox(width: 10),
+              ],
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: kWine,
+                ),
+              ),
+            ],
+          ),
+          ?trailing,
         ],
       );
 }
@@ -90,27 +106,62 @@ class HerData {
   static Future<HerData> load() async {
     final d = HerData();
 
-    // 1. Fetch periods from backend
-    final backendPeriods = await TrackingService.getPeriods();
-    d.periods = backendPeriods
-        .map((p) => DateTime(p.startDate.year, p.startDate.month, p.startDate.day))
-        .toList()
-      ..sort((a, b) => b.compareTo(a));
+    // 1. Concurrently fetch all independent network requests & shared preferences
+    final results = await Future.wait<dynamic>([
+      TrackingService.getPeriods(),
+      TrackingService.getSymptoms(),
+      TrackingService.getCheckins(),
+      ProfileService.getProfile(),
+      AuthService.currentName(),
+      SharedPreferences.getInstance(),
+    ]);
 
-    for (final p in backendPeriods) {
-      final startKey = DateTime(p.startDate.year, p.startDate.month, p.startDate.day).toIso8601String();
-      d.periodIds[startKey] = p.id;
-      if (p.endDate != null) {
-        d.ends[startKey] = DateTime(p.endDate!.year, p.endDate!.month, p.endDate!.day);
+    final backendPeriods = results[0] as List<PeriodResponse>;
+    final backendSymptoms = results[1] as List<SymptomResponse>;
+    final backendCheckins = results[2] as List<CheckinResponse>;
+    final profile = results[3] as ProfileResponse?;
+    d.name = results[4] as String?;
+    final p = results[5] as SharedPreferences;
+
+    // Process periods
+    if (backendPeriods.isNotEmpty) {
+      d.periods = backendPeriods
+          .map((p) => DateTime(p.startDate.year, p.startDate.month, p.startDate.day))
+          .toList()
+        ..sort((a, b) => b.compareTo(a));
+
+      for (final p in backendPeriods) {
+        final startKey = DateTime(p.startDate.year, p.startDate.month, p.startDate.day).toIso8601String();
+        d.periodIds[startKey] = p.id;
+        if (p.endDate != null) {
+          d.ends[startKey] = DateTime(p.endDate!.year, p.endDate!.month, p.endDate!.day);
+        }
+      }
+    } else {
+      // Offline fallback for periods
+      final savedHistory = p.getStringList('period_history') ?? [];
+      d.periods = savedHistory
+          .map((s) => DateTime.parse(s))
+          .toList()
+        ..sort((a, b) => b.compareTo(a));
+
+      final savedEnds = p.getStringList('period_end_dates') ?? [];
+      for (final item in savedEnds) {
+        final parts = item.split('|');
+        if (parts.length == 2) {
+          d.ends[parts[0]] = DateTime.parse(parts[1]);
+        }
       }
     }
 
-    // 2. Fetch symptoms from backend
-    final backendSymptoms = await TrackingService.getSymptoms();
-    d.symptoms = backendSymptoms.map((s) => s.name).toSet().toList();
+    // Process symptoms
+    if (backendSymptoms.isNotEmpty) {
+      d.symptoms = backendSymptoms.map((s) => s.name).toSet().toList();
+    } else {
+      d.symptoms = p.getStringList('symptoms') ?? [];
+    }
 
-    // 3. Fetch checkins from backend
-    final backendCheckins = await TrackingService.getCheckins();
+    // Process checkins
     if (backendCheckins.isNotEmpty) {
       d.mood = backendCheckins.first.mood;
       if (backendCheckins.first.notes != null) {
@@ -120,18 +171,23 @@ class HerData {
             .where((s) => s.isNotEmpty)
             .toList();
       }
+    } else {
+      d.mood = p.getString('checkin_mood');
+      d.checkInSymptoms = p.getStringList('checkin_symptoms') ?? [];
     }
 
-    // 4. Fetch profile and user details
-    final profile = await ProfileService.getProfile();
-    final p = await SharedPreferences.getInstance();
-
+    // Process stage
     d.stage = profile?.lifecycleStage ?? p.getString('lifecycle_stage');
-    d.name = await AuthService.currentName();
 
-    // Sync SharedPreferences local cache for offline reliability
+    // Sync SharedPreferences local cache non-blockingly
+    _syncLocalCache(d, p);
+
+    return d;
+  }
+
+  static void _syncLocalCache(HerData d, SharedPreferences p) {
     if (d.periods.isNotEmpty) {
-      await p.setStringList(
+      p.setStringList(
         'period_history',
         d.periods.map((date) => date.toIso8601String()).toList(),
       );
@@ -139,15 +195,13 @@ class HerData {
     final endDateEntries = d.ends.entries
         .map((entry) => '${entry.key}|${entry.value.toIso8601String()}')
         .toList();
-    await p.setStringList('period_end_dates', endDateEntries);
+    p.setStringList('period_end_dates', endDateEntries);
     if (d.symptoms.isNotEmpty) {
-      await p.setStringList('symptoms', d.symptoms);
+      p.setStringList('symptoms', d.symptoms);
     }
     if (d.mood != null) {
-      await p.setString('checkin_mood', d.mood!);
+      p.setString('checkin_mood', d.mood!);
     }
-
-    return d;
   }
 
   static Future<void> addPeriod(DateTime date) async {

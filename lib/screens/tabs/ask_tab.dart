@@ -9,7 +9,6 @@ class _AskMessage {
   final String? intent;
   final String? safetyLevel;
   final String? disclaimer;
-  final List<AskSourceResponse> sources;
   final bool isError;
 
   const _AskMessage({
@@ -18,7 +17,6 @@ class _AskMessage {
     this.intent,
     this.safetyLevel,
     this.disclaimer,
-    this.sources = const [],
     this.isError = false,
   });
 }
@@ -74,7 +72,23 @@ class _AskTabState extends State<AskTab> {
   Future<void> _send(String text) async {
     final t = text.trim();
     if (t.isEmpty || _busy) return;
+
     _ctrl.clear();
+
+    // Construct recent conversation history (max 10 items) to send to backend
+    final recentHistory = _msgs
+        .where((m) => !m.isError)
+        .toList()
+        .reversed
+        .take(10)
+        .toList()
+        .reversed
+        .map((m) => ChatMessageItem(
+              role: m.fromUser ? 'user' : 'assistant',
+              content: m.text,
+            ))
+        .toList();
+
     setState(() {
       _msgs.add(_AskMessage(text: t, fromUser: true));
       _busy = true;
@@ -82,7 +96,7 @@ class _AskTabState extends State<AskTab> {
     _toEnd();
 
     try {
-      final res = await AskService.askQuestion(t);
+      final res = await AskService.askQuestion(t, history: recentHistory);
       if (!mounted) return;
       if (res != null) {
         setState(() {
@@ -93,7 +107,6 @@ class _AskTabState extends State<AskTab> {
               intent: res.intent,
               safetyLevel: res.safetyLevel,
               disclaimer: res.disclaimer,
-              sources: res.sources,
             ),
           );
           _busy = false;
@@ -102,7 +115,8 @@ class _AskTabState extends State<AskTab> {
         setState(() {
           _msgs.add(
             const _AskMessage(
-              text: 'Unable to retrieve educational resources at this time.',
+              text:
+                  "I'm having a little trouble responding right now. Please try again in a moment.",
               fromUser: false,
               isError: true,
             ),
@@ -112,10 +126,19 @@ class _AskTabState extends State<AskTab> {
       }
     } catch (e) {
       if (!mounted) return;
+      final rawError = e.toString().replaceAll('Exception: ', '');
+      final isTechnical = rawError.contains('DioException') ||
+          rawError.contains('SocketException') ||
+          rawError.contains('HttpException') ||
+          rawError.contains('connectTimeout');
+      final userMessage = isTechnical
+          ? "I'm having a little trouble responding right now. Please try again in a moment."
+          : rawError;
+
       setState(() {
         _msgs.add(
           _AskMessage(
-            text: e.toString().replaceAll('Exception: ', ''),
+            text: userMessage,
             fromUser: false,
             isError: true,
           ),
@@ -139,6 +162,9 @@ class _AskTabState extends State<AskTab> {
                 : Colors.white;
 
     final fg = m.fromUser ? Colors.white : Colors.black87;
+
+    // Ensure raw markdown syntax like ** is cleaned up for display
+    final cleanText = m.text.replaceAll('**', '');
 
     return Align(
       alignment: m.fromUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -193,73 +219,7 @@ class _AskTabState extends State<AskTab> {
                   ],
                 ),
               ),
-            Text(m.text, style: TextStyle(color: fg, height: 1.35, fontSize: 15)),
-            if (m.sources.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              const Text(
-                'Matching Educational Topics:',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: kWine,
-                ),
-              ),
-              const SizedBox(height: 6),
-              for (final s in m.sources)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: kBlush.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          s.title,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: kWine,
-                          ),
-                        ),
-                        if (s.summary != null && s.summary!.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            s.summary!,
-                            style: const TextStyle(fontSize: 12, color: Colors.black87),
-                          ),
-                        ],
-                        if (s.sourceName != null && s.sourceName!.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            'Source: ${s.sourceName}',
-                            style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.black54),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-            if (m.disclaimer != null && m.disclaimer!.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.info_outline, size: 12, color: Colors.black45),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      m.disclaimer!,
-                      style: const TextStyle(fontSize: 11, color: Colors.black45),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            Text(cleanText, style: TextStyle(color: fg, height: 1.35, fontSize: 15)),
           ],
         ),
       ),
@@ -277,6 +237,7 @@ class _AskTabState extends State<AskTab> {
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
               child: ScreenTitle(
                 'Ask',
+                showLogo: true,
                 trailing: const Pill(
                   'Info only',
                   icon: Icons.verified_user_outlined,
@@ -319,8 +280,28 @@ class _AskTabState extends State<AskTab> {
                   ],
                 ),
               ),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, size: 13, color: Colors.black45),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'HerLife provides health information for education and awareness, not medical diagnosis or treatment.',
+                      style: TextStyle(fontSize: 10.5, color: Colors.black45),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 8, 12),
+              padding: const EdgeInsets.fromLTRB(16, 4, 8, 12),
               child: Row(
                 children: [
                   Expanded(

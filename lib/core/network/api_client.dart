@@ -62,7 +62,16 @@ class ApiClient {
           error.type == DioExceptionType.receiveTimeout ||
           error.type == DioExceptionType.sendTimeout ||
           error.type == DioExceptionType.connectionError) {
-        return 'Unable to reach HerLife server. Please check your internet connection.';
+        final target = '${error.requestOptions.baseUrl}${error.requestOptions.path}';
+        final underlying = (error.error?.toString() ?? error.message ?? '').toLowerCase();
+
+        if (underlying.contains('cleartext') || underlying.contains('not permitted')) {
+          return 'Unable to reach HerLife server ($target): Cleartext HTTP traffic is blocked by device policy.';
+        }
+        if (underlying.contains('permission denied') || underlying.contains('eacces')) {
+          return 'Unable to reach HerLife server ($target): Network permission denied by OS.';
+        }
+        return 'Unable to reach HerLife server ($target). Please check your internet connection and verify the backend is running.';
       }
 
       if (error.response != null && error.response?.data != null) {

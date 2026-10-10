@@ -2,15 +2,27 @@ import 'package:dio/dio.dart';
 import 'package:herlife/core/network/api_client.dart';
 import 'package:herlife/models/api_models.dart';
 
-/// Service for making questions to the backend educational search endpoint POST /api/ask.
+/// Service for making questions to the backend conversational search endpoint POST /api/ask.
 class AskService {
-  /// Sends a user question to the backend and returns structured educational sources and answer.
-  static Future<AskResponse?> askQuestion(String question) async {
+  /// Sends a user question and recent conversation history to the backend endpoint POST /api/ask.
+  static Future<AskResponse?> askQuestion(
+    String question, {
+    List<ChatMessageItem> history = const [],
+  }) async {
     try {
       final dio = ApiClient().dio;
+      final requestData = AskRequest(
+        question: question,
+        conversationHistory: history,
+      ).toJson();
+
       final response = await dio.post(
         '/api/ask',
-        data: {'question': question},
+        data: requestData,
+        options: Options(
+          sendTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
+        ),
       );
 
       if (response.data != null) {
@@ -21,9 +33,11 @@ class AskService {
       if (e.response?.data != null && e.response?.data['detail'] != null) {
         throw Exception(e.response?.data['detail'].toString());
       }
-      rethrow;
+      throw Exception(ApiClient.formatError(e));
     } catch (_) {
-      return null;
+      throw Exception(
+        "I'm having a little trouble responding right now. Please try again in a moment.",
+      );
     }
   }
 }
