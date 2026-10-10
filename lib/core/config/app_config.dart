@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///
 /// Base URL resolution:
 /// 1. Run-time override set via [setBaseUrl] or loaded from SharedPreferences.
+///    A saved override is discarded if it was saved under a different
+///    `API_BASE_URL` build value (stale URL from an older APK).
 /// 2. Dart define flag: `--dart-define=API_BASE_URL=http://192.168.x.x:8000`.
 /// 3. Default platform fallback (Android emulator: 10.0.2.2, Web/Desktop/iOS: 127.0.0.1).
 class AppConfig {
@@ -15,6 +17,7 @@ class AppConfig {
   );
 
   static const String _prefKey = 'custom_api_base_url';
+  static const String _prefBuildKey = 'custom_api_base_url_build';
 
   static String? _overrideBaseUrl;
 
@@ -32,9 +35,18 @@ class AppConfig {
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getString(_prefKey);
-      if (saved != null && saved.trim().isNotEmpty) {
-        _overrideBaseUrl = _sanitize(saved);
+      if (saved == null || saved.trim().isEmpty) return;
+
+      final env = _sanitize(_envBaseUrl);
+      final savedForBuild = prefs.getString(_prefBuildKey) ?? '';
+      if (env.isNotEmpty && savedForBuild != env) {
+        // Stale override saved under a different build URL: drop it.
+        _overrideBaseUrl = null;
+        await prefs.remove(_prefKey);
+        await prefs.remove(_prefBuildKey);
+        return;
       }
+      _overrideBaseUrl = _sanitize(saved);
     } catch (_) {}
   }
 
@@ -46,8 +58,10 @@ class AppConfig {
       final prefs = await SharedPreferences.getInstance();
       if (clean.isEmpty) {
         await prefs.remove(_prefKey);
+        await prefs.remove(_prefBuildKey);
       } else {
         await prefs.setString(_prefKey, clean);
+        await prefs.setString(_prefBuildKey, _sanitize(_envBaseUrl));
       }
     } catch (_) {}
   }
@@ -88,4 +102,3 @@ class AppConfig {
     return 'Default Fallback';
   }
 }
-

@@ -42,7 +42,8 @@ class ApiClient {
           return handler.next(options);
         },
         onError: (DioException error, handler) async {
-          if (error.response?.statusCode == 401) {
+          if (error.response?.statusCode == 401 &&
+              !error.requestOptions.path.endsWith('/api/auth/login')) {
             await TokenStorageService.clearToken();
             onUnauthorized?.call();
           }

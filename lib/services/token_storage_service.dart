@@ -27,7 +27,12 @@ class TokenStorageService {
   static Future<String?> getToken() async {
     if (_cachedToken != null) return _cachedToken;
     if (!_isInitialized) {
-      _cachedToken = await _storage.read(key: _tokenKey);
+      try {
+        _cachedToken = await _storage.read(key: _tokenKey);
+      } catch (_) {
+        // Keystore read failure: treat as no token instead of crashing startup.
+        _cachedToken = null;
+      }
       _isInitialized = true;
     }
     return _cachedToken;
@@ -46,4 +51,3 @@ class TokenStorageService {
     return token != null && token.isNotEmpty;
   }
 }
-

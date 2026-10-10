@@ -112,7 +112,11 @@ class _AppGateState extends State<AppGate> {
 
   Future<Widget> _decide() async {
     final isValidSession = await AuthService.validateSession();
-    if (!isValidSession) return const WelcomeScreen();
+    // validateSession clears the token on 401. If a token is still stored,
+    // the failure was transient (offline/server down): keep the user in.
+    if (!isValidSession && !await AuthService.isLoggedIn()) {
+      return const WelcomeScreen();
+    }
 
     final prefs = await SharedPreferences.getInstance();
     final stage = prefs.getString('lifecycle_stage');

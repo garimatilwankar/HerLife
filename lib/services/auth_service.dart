@@ -114,15 +114,13 @@ class AuthService {
     try {
       final dio = ApiClient().dio;
 
-      // Form data format expected by OAuth2PasswordRequestForm
-      final formData = FormData.fromMap({
-        'username': cleanEmail,
-        'password': password,
-      });
-
+      // Urlencoded body expected by OAuth2PasswordRequestForm
       final response = await dio.post(
         '/api/auth/login',
-        data: formData,
+        data: {
+          'username': cleanEmail,
+          'password': password,
+        },
         options: Options(
           contentType: Headers.formUrlEncodedContentType,
         ),

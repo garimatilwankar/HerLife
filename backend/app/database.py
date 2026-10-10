@@ -1,9 +1,12 @@
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
+# Load backend/.env regardless of the directory uvicorn is started from.
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -15,7 +18,8 @@ engine = create_engine(
     DATABASE_URL.replace(
         "postgresql://",
         "postgresql+psycopg2://",
-    )
+    ),
+    pool_pre_ping=True,
 )
 
 SessionLocal = sessionmaker(
