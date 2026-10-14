@@ -34,3 +34,8 @@ backend/venv/
 backend/.venv/
 __pycache__/
 *.py[cod]
+
+# Backups & Archives
+backend/backups/
+backups/
+*.zip

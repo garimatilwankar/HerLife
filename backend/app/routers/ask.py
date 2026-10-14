@@ -53,14 +53,38 @@ def ask_question(
             detail="Question cannot be empty.",
         )
 
-    # 1. Deterministic safety classification evaluated on CURRENT question
-    classification = classify_question(question_text)
-
-    # 2. Fetch user profile lifecycle stage
+    # 1. Fetch user profile lifecycle stage and contexts
     profile = db.scalar(select(Profile).where(Profile.user_id == current_user.id))
-    user_stage = profile.lifecycle_stage.strip().lower() if (profile and profile.lifecycle_stage) else None
+    user_stage = None
+    user_contexts = []
+    if profile:
+        user_stage = profile.primary_stage or profile.lifecycle_stage
+        if user_stage:
+            user_stage = user_stage.strip().lower()
+        user_contexts = profile.contexts or []
 
-    # 3. Context-aware keyword extraction & retrieval (skip for greetings/identity/unrelated)
+    # 2. Deterministic safety classification evaluated on CURRENT question with stage awareness
+    classification = classify_question(
+        question_text,
+        lifecycle_stage=user_stage,
+        contexts=user_contexts,
+    )
+
+    # 3. EMERGENCY / URGENT: Immediately return static safe response, BYPASSING article retrieval and Gemini
+    if classification.safety_level == SAFETY_URGENT:
+        return AskResponse(
+            question=question_text,
+            intent=classification.intent,
+            safety_level=classification.safety_level,
+            answer=classification.override_answer or (
+                "If you are experiencing severe symptoms such as heavy bleeding, severe pain, or feeling faint, "
+                "please seek immediate emergency medical care right away."
+            ),
+            sources=[],
+            disclaimer=DISCLAIMER,
+        )
+
+    # 4. Context-aware keyword extraction & retrieval (skip for greetings/identity/unrelated)
     non_retrieval_intents = {INTENT_GREETING, INTENT_IDENTITY, INTENT_GENERAL_KNOWLEDGE}
 
     top_articles = []
@@ -120,57 +144,49 @@ def ask_question(
 
     sources = [AskSourceSchema.model_validate(art) for art in top_articles] if top_articles else []
 
-    # 4. Handle response generation
-    # EMERGENCY / URGENT: Skip Gemini for instant safety guidance
-    if classification.safety_level == SAFETY_URGENT:
-        answer = classification.override_answer or (
-            "If you are experiencing severe symptoms such as heavy bleeding, severe pain, or feeling faint, "
-            "please seek immediate emergency medical care right away."
-        )
-    else:
-        # Generate conversational AI answer with Gemini using conversation history and grounding
-        ai_answer = generate_conversational_answer(
-            question=question_text,
-            conversation_history=data.conversation_history,
-            retrieved_articles=top_articles,
-            intent=classification.intent,
-            safety_level=classification.safety_level,
-        )
+    # 5. Generate conversational AI answer with Gemini using conversation history and grounding
+    ai_answer = generate_conversational_answer(
+        question=question_text,
+        conversation_history=data.conversation_history,
+        retrieved_articles=top_articles,
+        intent=classification.intent,
+        safety_level=classification.safety_level,
+    )
 
-        if ai_answer:
-            answer = ai_answer
+    if ai_answer:
+        answer = ai_answer
+    else:
+        # Deterministic conversational fallback if Gemini service is unavailable
+        if classification.override_answer:
+            answer = classification.override_answer
+        elif classification.intent == INTENT_GREETING:
+            answer = (
+                "Hi! I'm HerLife, your women's health chatbot. "
+                "I can help you understand your cycle, symptoms, reproductive health, and other women's health topics. "
+                "What would you like to know?"
+            )
+        elif classification.intent == INTENT_IDENTITY:
+            answer = (
+                "I am HerLife, a supportive and informative women's health education chatbot. "
+                "I'm here to help you learn about your cycle, reproductive health, and wellness."
+            )
+        elif classification.intent == INTENT_GENERAL_KNOWLEDGE:
+            answer = (
+                "I'm primarily designed to help with women's health education, so I might not have full details on that general topic. "
+                "Feel free to ask me anything about your cycle, symptoms, or health!"
+            )
+        elif top_articles:
+            art = top_articles[0]
+            summary_text = (art.summary or art.content or "").strip()
+            if len(summary_text) > 250:
+                summary_text = summary_text[:247].rsplit(" ", 1)[0] + "..."
+            answer = f"{art.title}: {summary_text}"
         else:
-            # Deterministic conversational fallback if Gemini service is unavailable
-            if classification.override_answer:
-                answer = classification.override_answer
-            elif classification.intent == INTENT_GREETING:
-                answer = (
-                    "Hi! I'm HerLife, your women's health chatbot. "
-                    "I can help you understand your cycle, symptoms, reproductive health, and other women's health topics. "
-                    "What would you like to know?"
-                )
-            elif classification.intent == INTENT_IDENTITY:
-                answer = (
-                    "I am HerLife, a supportive and informative women's health education chatbot. "
-                    "I'm here to help you learn about your cycle, reproductive health, and wellness."
-                )
-            elif classification.intent == INTENT_GENERAL_KNOWLEDGE:
-                answer = (
-                    "I'm primarily designed to help with women's health education, so I might not have full details on that general topic. "
-                    "Feel free to ask me anything about your cycle, symptoms, or health!"
-                )
-            elif top_articles:
-                art = top_articles[0]
-                summary_text = (art.summary or art.content or "").strip()
-                if len(summary_text) > 250:
-                    summary_text = summary_text[:247].rsplit(" ", 1)[0] + "..."
-                answer = f"{art.title}: {summary_text}"
-            else:
-                answer = (
-                    "I am HerLife, your women's health chatbot. "
-                    "I can help explain menstrual cycles, symptoms, and reproductive health. "
-                    "What health question can I help answer for you?"
-                )
+            answer = (
+                "I am HerLife, your women's health chatbot. "
+                "I can help explain menstrual cycles, symptoms, and reproductive health. "
+                "What health question can I help answer for you?"
+            )
 
     return AskResponse(
         question=question_text,
