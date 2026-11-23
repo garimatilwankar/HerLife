@@ -34,3 +34,9 @@ backend/venv/
 backend/.venv/
 __pycache__/
 *.py[cod]
+# Local database backups
+/backend/backups/
+
+# Cleanup
+.dart_tool_old/
+*.iml
