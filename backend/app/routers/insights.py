@@ -1,10 +1,9 @@
-from datetime import date
-
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user
+from app.core.cycle_math import build_cycle_summary
 from app.database import get_db
 from app.models.checkin import DailyCheckin
 from app.models.period import Period
@@ -81,42 +80,28 @@ def build_lifecycle_insight(profile: Profile | None):
 
 
 def calculate_cycle_insight(periods: list[Period]):
-    if len(periods) < 2:
-        return {
-            "average_cycle_length": None,
-            "cycles_recorded": len(periods),
-            "message": "Record at least two periods to identify cycle patterns.",
-        }
+    summary = build_cycle_summary(periods)
+    cycles = summary["cycles"]
 
-    lengths = []
+    # Old keys are kept so the current Flutter screens don't break.
+    # cycle_lengths stays newest first, as before.
+    lengths_newest_first = [c["length"] for c in reversed(cycles)]
 
-    for index in range(len(periods) - 1):
-        current = periods[index].start_date
-        previous = periods[index + 1].start_date
-
-        cycle_length = (current - previous).days
-
-        if cycle_length > 0:
-            lengths.append(cycle_length)
-
-    if not lengths:
-        return {
-            "average_cycle_length": None,
-            "cycles_recorded": len(periods),
-            "message": "Not enough valid cycle data yet.",
-        }
-
-    average = round(sum(lengths) / len(lengths), 1)
+    if summary["average_cycle_length"] is None:
+        message = "Record at least two periods to identify cycle patterns."
+    else:
+        message = (
+            f"Your recorded cycles average "
+            f"{summary['average_cycle_length']} days."
+        )
 
     return {
-        "average_cycle_length": average,
-        "cycle_lengths": lengths,
-        "cycles_recorded": len(periods),
-        "message": (
-            f"Your recorded cycles average {average} days."
-        ),
+        "average_cycle_length": summary["average_cycle_length"],
+        "cycle_lengths": lengths_newest_first,
+        "cycles_recorded": summary["cycles_recorded"],
+        "message": message,
+        "summary": summary,
     }
-
 
 def analyze_symptoms(symptoms: list[Symptom]):
     if not symptoms:
