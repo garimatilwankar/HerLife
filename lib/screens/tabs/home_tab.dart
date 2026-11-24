@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:herlife/main.dart' show CheckInScreen;
-import 'package:herlife/screens/lifecycle_screen.dart';
-import 'package:herlife/screens/settings_screen.dart';
 import 'package:herlife/screens/tabs/ui.dart';
-import 'package:herlife/widgets/herlife_logo.dart';
+import 'package:herlife/widgets/herlife_header.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -51,14 +49,6 @@ class _HomeTabState extends State<HomeTab> {
     _load();
   }
 
-  void _openSettings() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const SettingsScreen(),
-      ),
-    ).then((_) => _load());
-  }
 
   Widget _ring(HerData d) {
     final has = d.cycleDay > 0;
@@ -181,62 +171,7 @@ class _HomeTabState extends State<HomeTab> {
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              Row(
-                children: [
-                  const HerLifeLogoMark(size: 32),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Hi, ${data.name ?? 'there'}',
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: kWine,
-                          ),
-                        ),
-                        Text(
-                          data.stage ?? 'HerLife Health Tracker',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.black54,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Pill(
-                    data.stage ?? 'Set stage',
-                    icon: Icons.auto_awesome_outlined,
-                    onTap: () =>
-                        Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const LifecycleScreen(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Material(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    child: InkWell(
-                      onTap: _openSettings,
-                      borderRadius: BorderRadius.circular(14),
-                      child: const Padding(
-                        padding: EdgeInsets.all(11),
-                        child: Icon(
-                          Icons.settings_outlined,
-                          color: kWine,
-                          size: 22,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
+              const HerLifeHeader(subtitle: 'Home'),              const SizedBox(height: 16),
               _ring(data),
               const SizedBox(height: 14),
               Row(

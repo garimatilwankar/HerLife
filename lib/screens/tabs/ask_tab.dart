@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:herlife/models/api_models.dart';
 import 'package:herlife/screens/tabs/ui.dart';
 import 'package:herlife/services/ask_service.dart';
+import 'package:herlife/widgets/herlife_header.dart';
 
 class _AskMessage {
   final String text;
@@ -234,16 +235,19 @@ class _AskTabState extends State<AskTab> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-              child: ScreenTitle(
-                'Ask',
-                showLogo: true,
-                trailing: const Pill(
-                  'Info only',
-                  icon: Icons.verified_user_outlined,
-                ),
-              ),
-            ),
+  padding: const EdgeInsets.fromLTRB(8, 12, 20, 8),
+  child: Row(
+    children: [
+      IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => Navigator.pop(context),
+      ),
+      const Expanded(
+        child: HerLifeHeader(subtitle: 'Ask', showAsk: false),
+      ),
+    ],
+  ),
+),  
             Expanded(
               child: ListView(
                 controller: _scroll,

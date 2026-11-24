@@ -5,9 +5,9 @@ import 'package:herlife/services/tracking_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:herlife/screens/tabs/home_tab.dart';
 import 'package:herlife/screens/tabs/track_tab.dart';
-import 'package:herlife/screens/tabs/insights_tab.dart';
+import 'package:herlife/screens/tabs/wellness_tab.dart';
 import 'package:herlife/screens/tabs/learn_tab.dart';
-import 'package:herlife/screens/tabs/ask_tab.dart';
+import 'package:herlife/screens/settings_screen.dart';
 import 'package:herlife/screens/tabs/ui.dart';
 import 'package:herlife/screens/lifecycle_screen.dart';
 import 'package:herlife/widgets/herlife_logo.dart';
@@ -232,26 +232,19 @@ class _MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> screens = const [
     HomeTab(),
-    TrackTab(),
-    InsightsTab(),
+    TrackTab(), // will hold the merged Track + Insights content
+    WellnessTab(),
     LearnTab(),
-    AskTab(),
+    SettingsScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: currentIndex,
-        children: screens,
-      ),
+      body: IndexedStack(index: currentIndex, children: screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            currentIndex = index;
-          });
-        },
+        onDestinationSelected: (i) => setState(() => currentIndex = i),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -264,9 +257,9 @@ class _MainNavigationState extends State<MainNavigation> {
             label: 'Track',
           ),
           NavigationDestination(
-            icon: Icon(Icons.insights_outlined),
-            selectedIcon: Icon(Icons.insights),
-            label: 'Insights',
+            icon: Icon(Icons.self_improvement_outlined),
+            selectedIcon: Icon(Icons.self_improvement),
+            label: 'Wellness',
           ),
           NavigationDestination(
             icon: Icon(Icons.menu_book_outlined),
@@ -274,16 +267,15 @@ class _MainNavigationState extends State<MainNavigation> {
             label: 'Learn',
           ),
           NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
-            label: 'Ask',
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
       ),
     );
   }
 }
-
 class CheckInScreen extends StatefulWidget {
   const CheckInScreen({super.key});
 
