@@ -5,11 +5,10 @@ import 'package:herlife/services/profile_service.dart';
 import 'package:herlife/services/tracking_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:herlife/widgets/herlife_logo.dart';
-
-const kWine = Color(0xFF7E2A3C);
-const kBlush = Color(0xFFFFD9DE);
-const kBg = Color(0xFFFBF9F6);
-
+import 'package:herlife/core/design_tokens.dart';
+const kWine = HL.wine;
+const kBlush = HL.blush;
+const kBg = HL.cream;
 class AppCard extends StatelessWidget {
   final Widget child;
   final VoidCallback? onTap;
