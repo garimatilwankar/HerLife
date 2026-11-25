@@ -14,6 +14,7 @@ import 'package:herlife/widgets/herlife_logo.dart';
 import 'package:herlife/core/network/api_client.dart';
 import 'package:herlife/core/config/app_config.dart';
 import 'package:herlife/widgets/server_config_dialog.dart';
+import 'package:herlife/core/tab_nav.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -232,11 +233,30 @@ class _MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> screens = const [
     HomeTab(),
-    TrackTab(), // will hold the merged Track + Insights content
+    TrackTab(),
     WellnessTab(),
     LearnTab(),
     SettingsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    TabNav.index.value = 0;
+    TabNav.index.addListener(_onTabChange);
+  }
+
+  @override
+  void dispose() {
+    TabNav.index.removeListener(_onTabChange);
+    super.dispose();
+  }
+
+  void _onTabChange() {
+    if (mounted && TabNav.index.value != currentIndex) {
+      setState(() => currentIndex = TabNav.index.value);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -244,7 +264,7 @@ class _MainNavigationState extends State<MainNavigation> {
       body: IndexedStack(index: currentIndex, children: screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,
-        onDestinationSelected: (i) => setState(() => currentIndex = i),
+        onDestinationSelected: (i) => TabNav.index.value = i,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -276,6 +296,7 @@ class _MainNavigationState extends State<MainNavigation> {
     );
   }
 }
+
 class CheckInScreen extends StatefulWidget {
   const CheckInScreen({super.key});
 
