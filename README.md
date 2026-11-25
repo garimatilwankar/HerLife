@@ -9,51 +9,44 @@ Stack: Flutter (app), FastAPI + SQLAlchemy (backend), PostgreSQL, JWT login.
 
 Defined once in `backend/app/core/stages.py` and `lib/core/stages.dart`.
 Never type a stage name anywhere else.
-
 Adolescence, Menstruation, Pregnancy, Postpartum, Perimenopause, Menopause.
-
-PCOS/PCOD is a condition flag on the profile (`pcos_status`), not a stage.
 
 ## App layout
 
-Five bottom tabs: Home, Track (logging + patterns together), Wellness, Learn, Settings.
+Five tabs: Home, Track (logging + patterns together), Wellness, Learn, Settings.
 Every tab uses the shared header in `lib/widgets/herlife_header.dart`
-(logo, name, life stage, and the Ask button at the top right).
+(logo, name, life stage, Ask button at top right).
+Home has one top card: calendar shortcut to Track, period day or next period
+date, small cycle ring, and a daily fact (`lib/core/health_facts.dart`).
 
 ## Run it
 
-Backend (from the `backend` folder, venv active):
+Backend (from `backend`, venv active):
 
     python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
-App (from the repo root):
-
-    flutter run
+App (from the repo root): `flutter run`
 
 On a real phone, set the server URL in the app to `http://<your-PC-IP>:8000`
-(phone and PC on the same Wi-Fi). On the Android emulator it is `http://10.0.2.2:8000`.
+(same Wi-Fi). On the Android emulator use `http://10.0.2.2:8000`.
 
-Tests (from the `backend` folder): `python -m pytest tests -q`
+Tests (from `backend`): `python -m pytest tests -q`
+After pulling the onboarding branch, run once: `python add_profile_columns.py`
 
-After adding profile columns, run once: `python add_profile_columns.py`
+## Branches
 
-## Branch log
+Each branch is stacked on the one above it, so merge them in this order.
 
-One branch per feature. If something breaks, find the branch that last touched it.
-
-| Branch | What it did | Status |
+| Order | Branch | What it does |
 |---|---|---|
-| fix/cycle-math | One shared cycle calculation | not merged yet |
-| fix/stage-names | Six stages defined in one place, validated by the backend | not merged yet |
-| feature/app-shell | 5 tabs, shared header with stage name, merged Track tab | done |
-| feature/onboarding | Profile fields for onboarding answers and PCOS/PCOD flag (screens not built yet) | on hold |
-| feature/home-polish | Home top card: calendar shortcut, period day or next period date, small ring, daily fact (stored in app) | in progress |
+| 1 | fix/cycle-math | One shared cycle calculation |
+| 2 | fix/stage-names | Six stages defined in one place, validated by the backend |
+| 3 | feature/app-shell | 5 tabs, shared header with stage name, merged Track tab |
+| 4 | feature/onboarding | New profile fields for onboarding answers and PCOS/PCOD flag (no screens yet) |
+| 5 | feature/home-card | Home top card with daily fact and calendar shortcut |
 
-## On hold
+If something breaks, find the branch that last touched the file.
 
-Sign-up questionnaire, first-time tutorial cards, Wellness tab (videos, diet questionnaire, calm sounds).
+## Not started or on hold
 
-## Planned
-
-PCOS/PCOD content across tabs, Learn tab by stage, widgets, Med-Gemini/MedGemma in Ask
-(with the safety rules layer kept in front of it).
+PCOS/PCOD settings, sign-up questionnaire, tutorial cards, Wellness tab, Learn by stage.
