@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -15,14 +15,28 @@ router = APIRouter(
 _is_seeded = False
 
 
+def _migrate_legacy_stage_names(db: Session):
+    """One-time cleanup of old stage spellings in saved articles."""
+    # These were duplicates of the Menstruation article.
+    db.execute(
+        delete(EducationArticle).where(
+            EducationArticle.lifecycle_stage.in_(
+                ["Reproductive Years", "Reproductive Health", "Conception"]
+            )
+        )
+    )
+    db.commit()
+    
 def seed_education_data(db: Session):
     """Seed initial educational content if the education table is empty."""
     global _is_seeded
     if _is_seeded:
         return
 
-    existing_count = db.scalar(select(EducationArticle).limit(1))
-    if existing_count is not None:
+    _migrate_legacy_stage_names(db)
+
+    existing = db.scalar(select(EducationArticle).limit(1))
+    if existing is not None:
         _is_seeded = True
         return
 

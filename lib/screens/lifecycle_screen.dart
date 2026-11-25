@@ -2,6 +2,7 @@ import 'package:herlife/main.dart' show MainNavigation;
 import 'package:flutter/material.dart';
 import 'package:herlife/services/profile_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:herlife/core/stages.dart';
 
 class LifecycleScreen extends StatefulWidget {
   const LifecycleScreen({super.key});
@@ -14,15 +15,7 @@ class _LifecycleScreenState extends State<LifecycleScreen> {
   String? selectedStage;
   bool saving = false;
 
-  final stages = [
-    'Adolescence',
-    'Menstruation',
-    'Reproductive Health',
-    'Pregnancy',
-    'Postpartum',
-    'Perimenopause',
-    'Menopause',
-  ];
+  final stages = LifeStages.all;
 
   @override
   void initState() {
@@ -33,8 +26,9 @@ class _LifecycleScreenState extends State<LifecycleScreen> {
   Future<void> _loadLifecycleStage() async {
     final profile = await ProfileService.getProfile();
     final prefs = await SharedPreferences.getInstance();
-    final savedStage = profile?.lifecycleStage ?? prefs.getString('lifecycle_stage');
-
+    final savedStage = LifeStages.normalize(
+      profile?.lifecycleStage ?? prefs.getString('lifecycle_stage'),
+    );
     if (!mounted) return;
 
     setState(() {

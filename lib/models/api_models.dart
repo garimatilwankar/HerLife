@@ -50,6 +50,13 @@ class ProfileResponse {
   final DateTime? dateOfBirth;
   final String? biologicalAssignment;
   final String? lifecycleStage;
+  final String? pcosStatus;
+  final DateTime? lastPeriodDate;
+  final int? cycleLength;
+  final int? periodLength;
+  final String? mainConcerns;
+  final bool onboardingCompleted;
+  final bool tutorialSeen;
 
   const ProfileResponse({
     required this.id,
@@ -57,6 +64,13 @@ class ProfileResponse {
     this.dateOfBirth,
     this.biologicalAssignment,
     this.lifecycleStage,
+    this.pcosStatus,
+    this.lastPeriodDate,
+    this.cycleLength,
+    this.periodLength,
+    this.mainConcerns,
+    this.onboardingCompleted = false,
+    this.tutorialSeen = false,
   });
 
   factory ProfileResponse.fromJson(Map<String, dynamic> json) {
@@ -68,6 +82,15 @@ class ProfileResponse {
           : null,
       biologicalAssignment: json['biological_assignment'] as String?,
       lifecycleStage: json['lifecycle_stage'] as String?,
+      pcosStatus: json['pcos_status'] as String?,
+      lastPeriodDate: json['last_period_date'] != null
+          ? DateTime.tryParse(json['last_period_date'] as String)
+          : null,
+      cycleLength: json['cycle_length'] as int?,
+      periodLength: json['period_length'] as int?,
+      mainConcerns: json['main_concerns'] as String?,
+      onboardingCompleted: json['onboarding_completed'] as bool? ?? false,
+      tutorialSeen: json['tutorial_seen'] as bool? ?? false,
     );
   }
 }

@@ -4,8 +4,8 @@ import 'package:herlife/screens/lifecycle_screen.dart';
 import 'package:herlife/services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:herlife/main.dart' show AppGate;
-import 'package:herlife/widgets/herlife_logo.dart';
 import 'package:herlife/services/profile_service.dart';
+import 'package:herlife/widgets/herlife_header.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -47,6 +47,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       anonymousTelemetry =
           prefs.getBool('anonymous_telemetry_enabled') ?? false;
     });
+        HerLifeHeader.reload.value++;
   }
 
   Future<void> _saveSetting(String key, bool value) async {
@@ -143,22 +144,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       backgroundColor: background,
-      appBar: AppBar(
-        backgroundColor: background,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Settings',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
+            const HerLifeHeader(subtitle: 'Settings'),
+            const SizedBox(height: 20),
             _profileCard(displayName, displayEmail),
             const SizedBox(height: 24),
 
@@ -310,24 +301,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const SizedBox(height: 24),
 
-            const Center(
-              child: HerLifeBrandLogo(
-                markSize: 36,
-                fontSize: 20,
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            const Center(
-              child: Text(
-                'Your health, your data, your journey.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.black54,
-                ),
-              ),
-            ),
           ],
         ),
       ),

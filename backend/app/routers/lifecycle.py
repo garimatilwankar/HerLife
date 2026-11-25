@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user
+from app.core.stages import DEFAULT_MESSAGE, STAGE_MESSAGES, normalize_stage
 from app.database import get_db
 from app.models.profile import Profile
 from app.models.user import User
@@ -29,23 +30,13 @@ def get_lifecycle(
             "message": "Complete your profile to determine your lifecycle stage.",
         }
 
+    stage = normalize_stage(profile.lifecycle_stage)
+
     return {
-        "lifecycle_stage": profile.lifecycle_stage,
-        "message": get_lifecycle_message(profile.lifecycle_stage),
+        "lifecycle_stage": stage,
+        "message": get_lifecycle_message(stage),
     }
 
 
 def get_lifecycle_message(stage: str | None) -> str:
-    messages = {
-        "Adolescence": "Your body is going through important developmental changes.",
-        "Reproductive Years": "Your cycle and reproductive health can be tracked for patterns.",
-        "Pregnancy": "Pregnancy-related changes can be tracked and monitored.",
-        "Postpartum": "Your body is recovering and adapting after pregnancy.",
-        "Perimenopause": "Hormonal and cycle patterns may become more variable.",
-        "Menopause": "Changes after menopause can be tracked over time.",
-    }
-
-    return messages.get(
-        stage,
-        "Track your health regularly to understand your patterns.",
-    )
+    return STAGE_MESSAGES.get(stage or "", DEFAULT_MESSAGE)

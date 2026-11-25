@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:herlife/services/auth_service.dart';
 import 'package:herlife/services/profile_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:herlife/core/stages.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -24,15 +25,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   bool saving = false;
 
-  final lifecycleStages = const [
-    'Adolescence',
-    'Menstruation',
-    'Reproductive Health',
-    'Pregnancy',
-    'Postpartum',
-    'Perimenopause',
-    'Menopause',
-  ];
+  final lifecycleStages = LifeStages.all;
 
   final biologicalOptions = const [
     'Female',
@@ -66,7 +59,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       nameController.text = savedName ?? '';
       emailController.text = savedEmail ?? '';
       biologicalAssignment = profile?.biologicalAssignment ?? prefs.getString('biological_assignment');
-      lifecycleStage = profile?.lifecycleStage ?? prefs.getString('lifecycle_stage');
+      lifecycleStage = LifeStages.normalize(
+        profile?.lifecycleStage ?? prefs.getString('lifecycle_stage'),
+      );
       dateOfBirth = profile?.dateOfBirth ??
           (prefs.getString('date_of_birth') != null
               ? DateTime.tryParse(prefs.getString('date_of_birth')!)
