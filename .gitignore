@@ -40,3 +40,6 @@ __pycache__/
 # Cleanup
 .dart_tool_old/
 *.iml
+
+.venv/
+.venv-*/

@@ -1,6 +1,10 @@
+from datetime import date, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+from app.core.cycle_math import build_cycle_summary
 
 from app.core.security import get_current_user
 from app.database import get_db
@@ -37,6 +41,25 @@ def create_period(
         raise HTTPException(
             status_code=400,
             detail="End date cannot be before start date.",
+        )
+
+    # One day of tolerance for time zones.
+    if data.start_date > date.today() + timedelta(days=1):
+        raise HTTPException(
+            status_code=400,
+            detail="Period start date cannot be in the future.",
+        )
+
+    existing = db.scalar(
+        select(Period).where(
+            Period.user_id == current_user.id,
+            Period.start_date == data.start_date,
+        )
+    )
+    if existing is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="A period starting on this date is already logged.",
         )
 
     period = Period(
@@ -207,3 +230,48 @@ def get_checkins(
             .order_by(DailyCheckin.recorded_on.desc())
         ).all()
     )
+
+@router.delete("/api/periods/{period_id}")
+def delete_period(
+    period_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    period = db.scalar(
+        select(Period).where(
+            Period.id == period_id,
+            Period.user_id == current_user.id,
+        )
+    )
+
+    if period is None:
+        raise HTTPException(status_code=404, detail="Period not found.")
+
+    db.delete(period)
+    db.commit()
+
+    return {"message": "Period deleted successfully."}
+
+
+# -------------------- CYCLE SUMMARY --------------------
+
+@router.get("/api/cycle/summary")
+def get_cycle_summary(
+    today: date | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """The single source of truth for Home, Track and Insights.
+
+    The app sends its own local date as ?today=YYYY-MM-DD so the day
+    count is correct in the user's time zone.
+    """
+    periods = list(
+        db.scalars(
+            select(Period)
+            .where(Period.user_id == current_user.id)
+            .order_by(Period.start_date.asc())
+        ).all()
+    )
+
+    return build_cycle_summary(periods, today=today)
