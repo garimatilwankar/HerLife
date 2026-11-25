@@ -165,28 +165,6 @@ class _LearnTabState extends State<LearnTab> {
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const ScreenTitle('Learn', showLogo: true),
-                  if (_userLifecycleStage != null && _userLifecycleStage!.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: kBlush,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        _userLifecycleStage!,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: kWine,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
               const SizedBox(height: 14),
               TextField(
                 onChanged: (v) => setState(() => _query = v),

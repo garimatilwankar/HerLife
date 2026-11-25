@@ -20,7 +20,7 @@ class WellnessTab extends StatelessWidget {
             children: [
               const Padding(
                 padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
-                child: HerLifeHeader(subtitle: 'Wellness'),
+                child: HerLifeHeader(),
               ),
               const TabBar(
                 labelColor: kWine,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:herlife/main.dart' show CheckInScreen;
 import 'package:herlife/screens/tabs/ui.dart';
 import 'package:herlife/widgets/herlife_header.dart';
 
@@ -25,6 +26,14 @@ class _TrackTabState extends State<TrackTab> {
   Future<void> _load() async {
     final data = await HerData.load();
     if (mounted) setState(() => d = data);
+  }
+
+  Future<void> _checkIn() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CheckInScreen()),
+    );
+    _load();
   }
 
   Future<void> _add() async {
@@ -70,16 +79,14 @@ class _TrackTabState extends State<TrackTab> {
     }
 
     final cells = <Widget>[
-      for (final l in const ['M', 'T', 'W', 'T', 'F', 'S', 'S'])
-        Center(
-            child: Text(l,
-                style: const TextStyle(fontSize: 12, color: Colors.black54))),
       for (var i = 0; i < offset; i++) const SizedBox.shrink(),
       for (var day = 1; day <= count; day++)
         Builder(builder: (_) {
           final x = DateTime(now.year, now.month, day);
           final period = periodIsoDates.contains(x.toIso8601String());
-          final predicted = next != null && x == next;
+          final predicted = next != null &&
+              !x.isBefore(next.subtract(const Duration(days: 3))) &&
+              !x.isAfter(next.add(const Duration(days: 3)));
           final isToday = x == now;
           return Center(
             child: Container(
@@ -109,6 +116,25 @@ class _TrackTabState extends State<TrackTab> {
                   const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
         ),
         const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            for (final l in const ['M', 'T', 'W', 'T', 'F', 'S', 'S'])
+              SizedBox(
+                width: 34,
+                child: Center(
+                  child: Text(
+                    l,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.black54,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
         GridView.count(
           crossAxisCount: 7,
           shrinkWrap: true,
@@ -227,7 +253,9 @@ class _TrackTabState extends State<TrackTab> {
                     '${data.ends[s.toIso8601String()]!.difference(s).inDays + 1} days')
               else
                 TextButton(
-                    onPressed: () => _end(s), child: const Text('Add end')),
+                  onPressed: () => _end(s),
+                  child: const Text('Add end'),
+                ),
             ]),
           ),
         ),
@@ -299,40 +327,44 @@ class _TrackTabState extends State<TrackTab> {
         label: const Text('Log period'),
       ),
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _load,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 90),
-            children: [
-              const HerLifeHeader(subtitle: 'Track'),
-              const SizedBox(height: 16),
-              Row(children: [
-                _stat('Cycle day',
-                    data.cycleDay > 0 ? '${data.cycleDay}' : '--'),
-                const SizedBox(width: 10),
-                _stat(
-                    'Next',
-                    data.next == null
-                        ? '--'
-                        : '${data.next!.day}/${data.next!.month}'),
-                const SizedBox(width: 10),
-                _stat('Average', '${data.avg.round()} d'),
-              ]),
-              const SizedBox(height: 14),
-              _calendar(data),
-              const SizedBox(height: 18),
-              _history(data),
-              const SizedBox(height: 18),
-              _patterns(data),
-              const SizedBox(height: 18),
-              const Center(
-                child: Text('Awareness only, not a diagnosis',
-                    style: TextStyle(fontSize: 12, color: Colors.black45)),
-              ),
-            ],
+  child: RefreshIndicator(
+    onRefresh: _load,
+    child: ListView(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
+      children: [
+        const HerLifeHeader(subtitle: 'Track'),
+        const SizedBox(height: 16),
+
+        Row(children: [
+          _stat('Cycle day',
+              data.cycleDay > 0 ? '${data.cycleDay}' : '--'),
+          const SizedBox(width: 10),
+          _stat(
+            'Next',
+            data.next == null
+                ? '--'
+                : '${data.next!.day}/${data.next!.month}',
+          ),
+          const SizedBox(width: 10),
+          _stat('Average', '${data.avg.round()} d'),
+        ]),
+        const SizedBox(height: 14),
+        _calendar(data),
+        const SizedBox(height: 18),
+        _history(data),
+        const SizedBox(height: 18),
+        _patterns(data),
+        const SizedBox(height: 18),
+        const Center(
+          child: Text(
+            'Awareness only, not a diagnosis',
+            style: TextStyle(fontSize: 12, color: Colors.black45),
           ),
         ),
-      ),
+      ],
+    ),
+  ),
+),
     );
   }
 }
