@@ -44,6 +44,7 @@ Each branch is stacked on the one above it, so merge them in this order.
 | 3 | feature/app-shell | 5 tabs, shared header with stage name, merged Track tab |
 | 4 | feature/onboarding | New profile fields for onboarding answers and PCOS/PCOD flag (no screens yet) |
 | 5 | feature/home-card | Home top card with daily fact and calendar shortcut |
+| 6 | feature/wellness-tab | Wellness tab: workout links, diet questionnaire with recipes, breathing exercises |
 
 If something breaks, find the branch that last touched the file.
 
