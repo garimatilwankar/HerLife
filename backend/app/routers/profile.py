@@ -35,14 +35,14 @@ def update_profile(
         select(Profile).where(Profile.user_id == current_user.id)
     )
 
+    # Only the fields the app actually sent. Anything not sent stays as it was.
+    changes = data.model_dump(exclude_unset=True)
+
     if profile is None:
-        profile = Profile(
-            user_id=current_user.id,
-            **data.model_dump(),
-        )
+        profile = Profile(user_id=current_user.id, **changes)
         db.add(profile)
     else:
-        for field, value in data.model_dump().items():
+        for field, value in changes.items():
             setattr(profile, field, value)
 
     db.commit()

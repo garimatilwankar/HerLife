@@ -21,6 +21,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   DateTime? dateOfBirth;
   String? biologicalAssignment;
   String? lifecycleStage;
+  String? pcosStatus;
 
   bool saving = false;
 
@@ -66,6 +67,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       nameController.text = savedName ?? '';
       emailController.text = savedEmail ?? '';
       biologicalAssignment = profile?.biologicalAssignment ?? prefs.getString('biological_assignment');
+      pcosStatus = prefs.getString('pcos_status');
       lifecycleStage = profile?.lifecycleStage ?? prefs.getString('lifecycle_stage');
       dateOfBirth = profile?.dateOfBirth ??
           (prefs.getString('date_of_birth') != null
@@ -124,6 +126,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       dateOfBirth: dateOfBirth,
       biologicalAssignment: biologicalAssignment,
       lifecycleStage: lifecycleStage,
+      pcosStatus: pcosStatus,
     );
 
     if (!mounted) return;
@@ -289,6 +292,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     lifecycleStage = value;
                   });
                 },
+              ),
+
+              const SizedBox(height: 14),
+
+              _pcosDropdown(),
+
+              const SizedBox(height: 6),
+
+              const Padding(
+                padding: EdgeInsets.only(left: 4),
+                child: Text(
+                  'PCOS/PCOD is not a life stage. It is added on top of your stage, '
+                  'so you still get your stage content plus extra support.',
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
               ),
 
               const SizedBox(height: 26),
@@ -467,6 +485,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           )
           .toList(),
       onChanged: onChanged,
+    );
+  }
+    Widget _pcosDropdown() {
+    return DropdownButtonFormField<String>(
+      initialValue: ProfileService.pcosOptions.containsKey(pcosStatus)
+          ? pcosStatus
+          : null,
+      decoration: InputDecoration(
+        labelText: 'PCOS / PCOD',
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      items: ProfileService.pcosOptions.entries
+          .map(
+            (e) => DropdownMenuItem(
+              value: e.key,
+              child: Text(e.value),
+            ),
+          )
+          .toList(),
+      onChanged: (value) {
+        setState(() {
+          pcosStatus = value;
+        });
+      },
     );
   }
 }

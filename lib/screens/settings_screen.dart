@@ -18,6 +18,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? name;
   String? email;
   String? lifecycleStage;
+  String? pcosStatus;
   bool notifications = true;
   bool anonymousTelemetry = false;
 
@@ -41,6 +42,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     setState(() {
       name = savedName;
+      pcosStatus = prefs.getString('pcos_status');
       email = savedEmail;
       lifecycleStage = profile?.lifecycleStage ?? prefs.getString('lifecycle_stage');
       notifications = prefs.getBool('notifications_enabled') ?? true;
@@ -185,6 +187,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: 'Lifecycle Stage',
                   subtitle: stage,
                   onTap: _changeLifecycleStage,
+                ),
+                _divider(),
+                _settingTile(
+                  icon: Icons.favorite_border,
+                  title: 'PCOS / PCOD',
+                  subtitle: ProfileService.pcosLabel(pcosStatus),
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const EditProfileScreen(),
+                      ),
+                    );
+                    _loadProfile();
+                  },
                 ),
               ],
             ),
