@@ -27,3 +27,11 @@ def test_profile_rejects_typo_and_accepts_legacy():
     )
     with pytest.raises(ValidationError):
         ProfileUpdate(lifecycle_stage="Perimenopau se")
+
+def test_onboarding_fields_validate():
+    ok = ProfileUpdate(pcos_status="Not_Sure", cycle_length=28, period_length=5)
+    assert ok.pcos_status == "not_sure"
+    with pytest.raises(ValidationError):
+        ProfileUpdate(pcos_status="maybe")
+    with pytest.raises(ValidationError):
+        ProfileUpdate(cycle_length=5)
