@@ -8,11 +8,30 @@ Stack: Flutter (app), FastAPI + SQLAlchemy (backend), PostgreSQL, JWT login.
 
 ## Current features
 
+### Sign up and first launch
+- Flow: Welcome, Sign up or Log in, then onboarding questions, then the 6-card tutorial, then the stage picker (only if no stage was set), then the app
+- The decision is made in AppGate (lib/main.dart)
+- Existing users see the questions once. Every question is skippable
+- The "onboarding done" flag is stored on the server profile and on the device. It is cleared on log out, so a second person on the same phone gets the questions
+
+### Onboarding questions (lib/screens/onboarding, lib/core/onboarding_questions.dart)
+- 14 personalisation questions, one per page, all skippable, with a progress bar
+- Cycle questions are hidden when periods have stopped or never started
+- All answers are saved on the device (lib/core/onboarding_store.dart)
+- Synced to the backend profile: life stage, PCOS/PCOD status, last period, cycle length, period length, goals (as main concerns). Mapping lives in lib/services/profile_service.dart
+- Not synced yet: symptoms, activity, sleep, stress, hormonal medication, focus
+- Life stage answers map to the six stages: Reproductive years becomes Menstruation, Postmenopause becomes Menopause, "I'm not sure" opens the stage picker
+
+### Tutorial guide (lib/screens/onboarding/tutorial_screen.dart)
+- Six swipeable cards: Home, Track, Wellness, Learn, Ask (top right), Settings
+- The Learn card tells new users where to read about their stage or a problem
+- Shown once. Skippable
+
 ### Shared header (lib/widgets/herlife_header.dart)
 - One line on every tab: HL logo, title, life stage chip, Ask button (top right)
 - Home shows "Hi, <name>". Every other tab shows its own name (Track, Wellness, Learn, Settings)
 - The stage chip never wraps. Long titles shorten with "..."
-- Name and stage load from the profile. Add 1 to `HerLifeHeader.reload` to refresh every header
+- Add 1 to `HerLifeHeader.reload` to refresh every header
 
 ### Home
 - Hero card with a soft gradient: phase chip, period day or next period date, animated cycle ring, daily health fact
@@ -21,6 +40,7 @@ Stack: Flutter (app), FastAPI + SQLAlchemy (backend), PostgreSQL, JWT login.
 - Your week: Monday to Sunday strip with period days, predicted range and today
 - Today's tip with Move, Eat and Calm switcher and an "Ask about this" button
 - Your pattern: unlocks after 3 cycles, with a progress bar and a "Why am I seeing this?" panel
+- PCOS / PCOD card (lib/widgets/pcos_card.dart): shown only when PCOS status is Yes (Move, Eat, Calm, Track tips) or Not sure (a gentle "talk to a doctor" card)
 - "Feeling off?" shortcut (opens Ask for now)
 - Summary tiles: last period, cycles, average
 - Loading placeholders and an error card with Retry, so a server failure never looks like "no data"
@@ -44,18 +64,10 @@ Stack: Flutter (app), FastAPI + SQLAlchemy (backend), PostgreSQL, JWT login.
 
 ### Settings
 - Server URL and app preferences
+- Edit Profile: name, email, date of birth, biological assignment, life stage, PCOS / PCOD status
 
-### Onboarding questions (built, not yet wired into sign up)
-- 14 personalisation questions, one per page, all skippable, with a progress bar
-- Covers life stage, cycles, known conditions, hormonal medication, cycle and period length, symptoms, last period, activity, sleep, stress and goals
-- Cycle questions are hidden when periods have stopped or never started
-- Answers are saved on the device for now (lib/core/onboarding_store.dart). Syncing to the backend profile is not done yet
-- Question wording lives in lib/core/onboarding_questions.dart
-
-### Tutorial guide (built, not yet wired into sign up)
-- Six swipeable cards after onboarding: Home, Track, Wellness, Learn, Ask (top right), Settings
-- The Learn card tells new users where to read about their stage or a problem
-- Shown once. Skippable
+### Profile saving
+- The profile is saved with PUT /api/profile/me. Only fields that are sent get changed (the backend uses `exclude_unset`, the app leaves out empty values), so saving one screen never wipes another screen's data
 
 --------------------------------------------------
 
@@ -71,8 +83,6 @@ Stack: Flutter (app), FastAPI + SQLAlchemy (backend), PostgreSQL, JWT login.
 Defined once in backend/app/core/stages.py and lib/core/stages.dart. Never type a stage name anywhere else.
 
 Current stages: Adolescence, Menstruation, Pregnancy, Postpartum, Perimenopause, Menopause.
-
-The onboarding question about life stage uses wider wording (for example Postmenopause, "I'm not sure"). Mapping those answers to the six stages is still to be decided.
 
 --------------------------------------------------
 
@@ -121,19 +131,20 @@ Each branch is stacked on the one above it, so merge in this order. Make a branc
 | 5 | feature/home-card | Home top card with daily fact and calendar shortcut |
 | 6 | feature/wellness-tab | Wellness tab: workout links, diet questionnaire with recipes, breathing |
 | 7 | feature/design-system | Single-line header with tab titles, design tokens, shared components, redesigned Home |
-| 8 | feature/onboarding-screens | 14-question onboarding and 6-card tutorial screens |
+| 8 | feature/onboarding-screens | 14-question onboarding and 6-card tutorial, wired into sign up, profile sync, profile-wipe fix |
+| 9 | feature/pcos-pcod | PCOS/PCOD Home card and Edit Profile setting |
 
 ### Planned
 
 | Branch | What it will do |
 |---|---|
-| feature/auth-flow | Wire onboarding and tutorial into sign up, splash, welcome, stage picker |
-| feature/pcos-pcod | PCOS/PCOD settings and content |
+| feature/onboarding-sync | Database columns so every onboarding answer syncs to the backend |
+| feature/pcos-content | PCOS/PCOD content in Wellness (workouts, food) and Learn (articles) |
 | feature/stage-resolver | Server tells the app which cards and content apply per stage |
 | feature/symptom-guide | "Feeling off?" guide and red-flag system |
 | feature/insights | Deeper analysis and doctor report PDF |
 | feature/ask-v2 | AI chat with safety layer (Med-Gemini) |
-| release/hardening | Cleartext traffic removal, signing, privacy and deletion |
+| release/hardening | Cleartext traffic removal, signing, privacy and deletion, consent wording |
 
 ### Conventions
 
@@ -153,7 +164,7 @@ Each branch is stacked on the one above it, so merge in this order. Make a branc
 
 ## Not started or on hold
 
-Wiring onboarding and tutorial into sign up, syncing answers to the backend, PCOS/PCOD settings, Learn by stage, widgets, Wellness videos by stage, Insights, Ask v2, Hindi/Hinglish, discreet mode and app lock.
+Syncing the remaining onboarding answers, PCOS/PCOD content in Wellness and Learn, Learn by stage, widgets, Wellness videos by stage, Insights, Ask v2, Hindi/Hinglish, discreet mode and app lock, consent wording update (data now goes to the server, not only the device).
 
 --------------------------------------------------
 
