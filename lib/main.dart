@@ -15,7 +15,10 @@ import 'package:herlife/core/network/api_client.dart';
 import 'package:herlife/core/config/app_config.dart';
 import 'package:herlife/widgets/server_config_dialog.dart';
 import 'package:herlife/core/tab_nav.dart';
+import 'package:herlife/screens/onboarding/onboarding_screen.dart';
+import 'package:herlife/services/profile_service.dart';
 
+final navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppConfig.loadPersistedUrl();
@@ -28,6 +31,7 @@ class HerLifeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'HerLife',
       theme: ThemeData(
@@ -114,6 +118,15 @@ class _AppGateState extends State<AppGate> {
   Future<Widget> _decide() async {
     final isValidSession = await AuthService.validateSession();
     if (!isValidSession) return const WelcomeScreen();
+        final onboardingDone = await ProfileService.isOnboardingDone();
+    if (!onboardingDone) {
+      return OnboardingScreen(
+        onComplete: () => navigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AppGate()),
+          (route) => false,
+        ),
+      );
+    }
 
     final prefs = await SharedPreferences.getInstance();
     final stage = prefs.getString('lifecycle_stage');

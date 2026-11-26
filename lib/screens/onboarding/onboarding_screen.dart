@@ -4,6 +4,8 @@ import 'package:herlife/core/onboarding_store.dart';
 import 'package:herlife/screens/onboarding/tutorial_screen.dart';
 import 'package:herlife/screens/tabs/ui.dart';
 import 'package:herlife/widgets/herlife_logo.dart';
+import 'package:herlife/services/profile_service.dart';
+import 'package:herlife/widgets/herlife_header.dart';
 
 /// One question per page, every question skippable.
 ///
@@ -118,8 +120,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     for (final q in onboardingQuestions) {
       if (q.hideWhen?.call(_a) == true) _a.remove(q.id);
     }
-    await OnboardingStore.saveAnswers(_a);
-    await OnboardingStore.markOnboardingDone();
+    await ProfileService.saveOnboardingAnswers(_a);
+    HerLifeHeader.reload.value++;
     if (!mounted) return;
     if (widget.editing) {
       widget.onComplete();

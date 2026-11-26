@@ -30,6 +30,9 @@ class AuthService {
     'checkin_mood',
     'checkin_symptoms',
     'consent_at',
+    'onboarding_answers',
+    'onboarding_done',
+    'tutorial_done',
   ];
 
   static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
@@ -162,6 +165,9 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_sessionEmailKey);
     await prefs.remove(_sessionNameKey);
+        for (final key in _userDataKeys) {
+      await prefs.remove(key);
+    }
   }
 
   // -------------------------

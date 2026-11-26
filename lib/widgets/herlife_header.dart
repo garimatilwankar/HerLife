@@ -1,3 +1,5 @@
+// ignore_for_file: unintended_html_in_doc_comment
+
 import 'package:flutter/material.dart';
 import 'package:herlife/core/stages.dart';
 import 'package:herlife/screens/tabs/ask_tab.dart';
