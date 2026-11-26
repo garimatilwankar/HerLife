@@ -5,6 +5,7 @@ import 'package:herlife/main.dart' show CheckInScreen;
 import 'package:herlife/screens/tabs/ask_tab.dart';
 import 'package:herlife/screens/tabs/ui.dart';
 import 'package:herlife/widgets/herlife_header.dart';
+import 'package:herlife/widgets/pcos_card.dart';
 
 /// Where she is in her cycle, with a gentle tip for each area.
 /// Phases are estimates from logged dates, never a diagnosis.
@@ -584,6 +585,7 @@ class _HomeTabState extends State<HomeTab> {
       gap,
       _insight(d),
       gap,
+      const PcosCard(),
       _feelingOff(),
       if (d.last != null) ...[
         gap,
