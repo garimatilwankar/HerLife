@@ -22,6 +22,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   DateTime? dateOfBirth;
   String? biologicalAssignment;
   String? lifecycleStage;
+  String? pcosStatus;
 
   bool saving = false;
 
@@ -119,6 +120,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       dateOfBirth: dateOfBirth,
       biologicalAssignment: biologicalAssignment,
       lifecycleStage: lifecycleStage,
+      pcosStatus: pcosStatus,
     );
 
     if (!mounted) return;
@@ -284,6 +286,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     lifecycleStage = value;
                   });
                 },
+              ),
+
+              const SizedBox(height: 14),
+
+              DropdownButtonFormField<String>(
+                initialValue: ProfileService.pcosOptions.containsKey(pcosStatus)
+                    ? pcosStatus
+                    : null,
+                decoration: InputDecoration(
+                  labelText: 'Do you have PCOS / PCOD?',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                items: ProfileService.pcosOptions.entries
+                    .map((e) => DropdownMenuItem(
+                          value: e.key,
+                          child: Text(e.value),
+                        ))
+                    .toList(),
+                onChanged: (value) => setState(() => pcosStatus = value),
               ),
 
               const SizedBox(height: 26),

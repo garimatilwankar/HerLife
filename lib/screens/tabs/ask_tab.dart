@@ -243,7 +243,7 @@ class _AskTabState extends State<AskTab> {
         onPressed: () => Navigator.pop(context),
       ),
       const Expanded(
-        child: HerLifeHeader(subtitle: 'Ask', showAsk: false),
+        child: HerLifeHeader(),
       ),
     ],
   ),

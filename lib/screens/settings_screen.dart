@@ -47,7 +47,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       anonymousTelemetry =
           prefs.getBool('anonymous_telemetry_enabled') ?? false;
     });
-        HerLifeHeader.reload.value++;
   }
 
   Future<void> _saveSetting(String key, bool value) async {
@@ -148,7 +147,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
-            const HerLifeHeader(subtitle: 'Settings'),
+            const HerLifeHeader(showAsk: false),
             const SizedBox(height: 20),
             _profileCard(displayName, displayEmail),
             const SizedBox(height: 24),
@@ -284,6 +283,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
 
             const SizedBox(height: 28),
+
+            const SizedBox(height: 24),
 
             OutlinedButton.icon(
               onPressed: _logout,

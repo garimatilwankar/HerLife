@@ -38,11 +38,11 @@ def update_profile(
     if profile is None:
         profile = Profile(
             user_id=current_user.id,
-            **data.model_dump(),
+            **data.model_dump(exclude_unset=True),
         )
         db.add(profile)
     else:
-        for field, value in data.model_dump().items():
+        for field, value in data.model_dump(exclude_unset=True).items():
             setattr(profile, field, value)
 
     db.commit()
